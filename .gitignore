@@ -1,0 +1,22 @@
+# Secrets / local runtime config — NEVER commit (real API keys, passwords,
+# camera recovery code, stream key, webhook token live here).
+.env
+.env.local
+
+# Debug/snapshot images captured during development (show the camera's view).
+*.jpg
+*.jpeg
+*.png
+
+# Proprietary camera firmware libraries, pulled from the camera to build rot90.so.
+# Not redistributable; obtain from your own device (see patches/rot90.c header).
+patches/camlib/
+
+# Runtime logs (bind-mounted from the container).
+asterisk-log/
+
+# Editor / OS cruft
+*.bak
+*.tmp
+.DS_Store
+Thumbs.db

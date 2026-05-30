@@ -1,0 +1,79 @@
+#==============================================================================
+# K3s / Kubernetes.
+#
+# hostNetwork: true is REQUIRED - same reason as docker (SIP/RTP + SDP).
+# Because the pod then uses a node's real IP, pin it to ONE node so the IP you
+# give Loxone ("Host for audio") stays stable. Set the nodeSelector below.
+#
+# 1) Build & push the image to a registry your cluster can pull from.
+# 2) Fill in the Secret (or create it from your .env:
+#      kubectl create secret generic doorbell-bridge-env \
+#        --from-env-file=.env -n home)
+# 3) kubectl apply -f k8s-deployment.yaml
+#==============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: home
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: doorbell-bridge-env
+  namespace: home
+type: Opaque
+stringData:
+  PROTECT_CAMERA_PATH: "rtspx://192.168.1.10:7441/CHANGEME"
+  PROTECT_BASE: "https://192.168.1.10"
+  PROTECT_API_KEY: "CHANGEME"
+  CAMERA_ID: "CHANGEME"
+  ARI_URL: "http://127.0.0.1:8088"
+  ARI_USER: "doorbellari"
+  ARI_PASS: "change-me-to-a-long-random-string"
+  APP_NAME: "doorbellbridge"
+  RX_PORT_FROM_ASTERISK: "9999"
+  DOORBELL_RTSP_AUDIO: "rtsp://127.0.0.1:8554/unifi_doorbell?audio"
+  RING_ENDPOINTS: "PJSIP/101"
+  DOORBELL_CALLERID: "Doorbell <9900>"
+  RING_TIMEOUT_MS: "45000"
+  NO_ANSWER_TIMEOUT_MS: "30000"
+  RING_DELAY_MS: "3500"
+  ENABLE_AGC: "1"
+  WEBHOOK_BIND: "0.0.0.0"
+  WEBHOOK_PORT: "3000"
+  WEBHOOK_PATH: "/doorbell/ring"
+  WEBHOOK_TOKEN: "change-me-too"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unifi-loxone-doorbell
+  namespace: home
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate          # only one instance may own the SIP/RTP ports
+  selector:
+    matchLabels:
+      app: unifi-loxone-doorbell
+  template:
+    metadata:
+      labels:
+        app: unifi-loxone-doorbell
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      # Pin to one node so the LAN IP is stable for Loxone. Change the value.
+      nodeSelector:
+        kubernetes.io/hostname: CHANGE-ME-node-name
+      containers:
+        - name: bridge
+          image: your-registry/unifi-loxone-doorbell:latest
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: doorbell-bridge-env
+          securityContext:
+            # Asterisk + go2rtc bind low/wide port ranges; host net needs this.
+            capabilities:
+              add: ["NET_BIND_SERVICE", "NET_RAW"]

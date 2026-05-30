@@ -1,0 +1,25 @@
+#==============================================================================
+# Proxmox / any Docker host.
+#
+# host networking is REQUIRED. SIP advertises IP/ports inside SDP and RTP is
+# symmetric; behind Docker's NAT bridge the audio silently breaks. With
+# network_mode: host the container uses the host's LAN IP directly - which is
+# also the IP you give Loxone as "Host for audio".
+#==============================================================================
+services:
+  doorbell-bridge:
+    build: .
+    # Or use a prebuilt image instead of build:
+    # image: your-registry/unifi-loxone-doorbell:latest
+    container_name: unifi-loxone-doorbell
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    volumes:
+      # Expose Asterisk's logs (incl. the 'security' channel) to the LXC so
+      # fail2ban can watch /opt/doorbell/asterisk-log/security and ban SIP
+      # scanners. entrypoint.sh chowns /var/log/asterisk to the asterisk user,
+      # which propagates to this bind mount, so Asterisk can write here.
+      - ./asterisk-log:/var/log/asterisk
+    # Config is otherwise rendered at boot from env; nothing else persisted.

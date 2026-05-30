@@ -1,0 +1,7 @@
+# Normalize line endings. These scripts run in a Linux container and on the
+# camera (busybox) — they MUST stay LF or bash/sh will choke on CR.
+* text=auto eol=lf
+*.so binary
+*.jpg binary
+*.jpeg binary
+*.png binary

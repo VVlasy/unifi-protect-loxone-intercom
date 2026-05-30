@@ -1,0 +1,27 @@
+# go2rtc.yaml  (rendered at container start from PROTECT_CAMERA_PATH)
+#
+# PROTECT_CAMERA_PATH is the RTSPS "share" link from UniFi Protect, e.g.
+#   rtspx://192.168.1.10:7441/aBcDeFgHiJkLmNoP
+# Enable it under: Protect > the doorbell > Settings > Advanced > RTSP.
+#
+# Streams derived from the share link:
+#   unifi_doorbell        -> audio only, consumed by the bridge (ffmpeg pulls it)
+#   unifi_doorbell_video  -> raw H264 video; served over go2rtc's local RTSP and
+#                            consumed by mjpeg-video.sh (ffmpeg -> mjpg-streamer).
+#                            Loxone's MJPEG comes from mjpg-streamer (:8080), not
+#                            go2rtc, so no MJPEG transcode stream is defined here.
+streams:
+  unifi_doorbell:
+    - "__PROTECT_CAMERA_PATH__#backchannel=0#media=audio"
+  unifi_doorbell_video:
+    - "__PROTECT_CAMERA_PATH__#backchannel=0#media=video"
+
+api:
+  listen: ":1985"   # go2rtc web UI/API (debug only). Loxone video now comes from
+                    # mjpg-streamer on :1984, so this was moved off 1984.
+
+rtsp:
+  listen: ":8554"   # internal: the bridge reads rtsp://127.0.0.1:8554/unifi_doorbell?audio
+
+log:
+  level: info
