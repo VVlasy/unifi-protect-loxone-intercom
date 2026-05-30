@@ -116,8 +116,8 @@ while true; do
     OK)           : ;;  # steady state - stay quiet
     UNREACHABLE)  log "camera unreachable (rebooting?); will retry" ;;
     DRIFT*)       log "drift: $st -> applying"
-                  r="$($SSH "$(apply_script)" 2>/dev/null)" || r="apply-failed"
-                  log "apply -> $r" ;;
+                  r="$($SSH "$(apply_script)" 2>&1)"
+                  log "apply -> ${r:-apply-failed(no output)}" ;;
     *)            log "unexpected check output: $st" ;;
   esac
   sleep "$ROTATION_CHECK_INTERVAL"
