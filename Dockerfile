@@ -81,7 +81,9 @@ COPY supervisord.conf  /etc/supervisor/conf.d/supervisord.conf
 COPY entrypoint.sh     /usr/local/bin/entrypoint.sh
 COPY mjpeg-video.sh    /usr/local/bin/mjpeg-video.sh
 COPY mjpg-serve.sh     /usr/local/bin/mjpg-serve.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/mjpeg-video.sh /usr/local/bin/mjpg-serve.sh
+COPY video-watchdog.sh /usr/local/bin/video-watchdog.sh
+COPY snapshot-delay.sh /usr/local/bin/snapshot-delay.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/mjpeg-video.sh /usr/local/bin/mjpg-serve.sh /usr/local/bin/video-watchdog.sh /usr/local/bin/snapshot-delay.sh
 
 # Binary/path hints for the bridge (overridable via env)
 ENV GO2RTC_PATH=/app/go2rtc \

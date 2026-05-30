@@ -109,14 +109,20 @@ echo APPLIED
 APPLY
 }
 
+# Deliver the remote script via base64 over STDIN (not as an ssh command arg):
+# a multi-KB inlined-base64 arg gets mangled by dropbear/busybox on the camera
+# (apply wrote nothing, silently), while stdin is byte-clean. `base64 -d | sh`
+# reconstructs and runs it on the camera.
+run_remote(){ "$@" | base64 -w0 | $SSH "base64 -d | sh"; }
+
 log "starting; camera=${CAMERA_IP} hallway=${HALLWAY_VALUE} flip=${ISP_FLIP} mirror=${ISP_MIRROR} interval=${ROTATION_CHECK_INTERVAL}s"
 while true; do
-  st="$($SSH "$(check_script)" 2>/dev/null)" || st="UNREACHABLE"
+  st="$(run_remote check_script 2>/dev/null)" || st="UNREACHABLE"
   case "$st" in
     OK)           : ;;  # steady state - stay quiet
     UNREACHABLE)  log "camera unreachable (rebooting?); will retry" ;;
     DRIFT*)       log "drift: $st -> applying"
-                  r="$($SSH "$(apply_script)" 2>&1)"
+                  r="$(run_remote apply_script 2>&1)"
                   log "apply -> ${r:-apply-failed(no output)}" ;;
     *)            log "unexpected check output: $st" ;;
   esac

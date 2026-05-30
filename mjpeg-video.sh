@@ -35,7 +35,11 @@ fi
 # supervisord also autorestarts us, but loop here to avoid restart churn.
 while true; do
   echo "[mjpeg-video] starting transcode ${SRC} -> ${OUT} (vf=${VF} ${MJPEG_FPS}fps q=${MJPEG_QUALITY})"
-  "${FFMPEG_PATH}" -hide_banner -loglevel warning \
+  # -y -nostdin: never block on the "file exists, overwrite? [y/N]" prompt on
+  # restart (that's an interactive hang with no stdin). A stalled/hung ffmpeg
+  # that doesn't exit is caught by video-watchdog.sh, which kills it -> this loop
+  # restarts it and reconnects to go2rtc.
+  "${FFMPEG_PATH}" -hide_banner -nostdin -y -loglevel warning \
     -rtsp_transport tcp -fflags nobuffer -flags low_delay \
     -i "${SRC}" \
     -an -vf "${VF}" -c:v mjpeg -r "${MJPEG_FPS}" -q:v "${MJPEG_QUALITY}" \

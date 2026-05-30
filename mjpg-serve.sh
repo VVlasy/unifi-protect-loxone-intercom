@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 #==============================================================================
-# Launch mjpg-streamer serving /dev/shm/cam.jpg (written by mjpeg-video.sh) at
-# :MJPEG_PORT/?action=stream (+ ?action=snapshot).
+# Launch mjpg-streamer on :MJPEG_PORT serving the DELAYED frame
+# (/dev/shm/snap/cam_snap.jpg, written by snapshot-delay.sh) so that BOTH
+# /?action=snapshot and /?action=stream are ~SNAPSHOT_DELAY_SECS behind. The
+# snapshot pre-roll catches the ring moment; the small stream lag is negligible
+# for a doorbell. (A dual-input setup to keep the stream live failed on this
+# mjpg-streamer build - the second input_file plugin never served.)
+# If SNAPSHOT_DELAY_SECS<=0, snapshot-delay.sh just mirrors live (no delay).
 #
-# Optional HTTP basic auth via output_http's built-in `-c user:pass`. Set
-# MJPEG_AUTH_USER + MJPEG_AUTH_PASS in .env to enable it; leave either empty to
-# serve without auth. NOTE: basic auth here is over plain HTTP, so creds are
-# base64 (not encrypted) on the wire - fine for LAN/VPN (8080 is not internet-
-# forwarded); put TLS in front (reverse proxy) if you ever expose it publicly.
+# Optional HTTP basic auth via output_http's `-c user:pass`. Plain HTTP -> keep
+# MJPEG_PORT LAN/VPN-only.
 #==============================================================================
 set -uo pipefail
 
@@ -16,7 +18,8 @@ set -uo pipefail
 : "${MJPEG_AUTH_PASS:=}"
 
 PLUGINDIR=/usr/local/lib/mjpg-streamer
-IN="${PLUGINDIR}/input_file.so -f /dev/shm -n cam.jpg -d 0.04"
+mkdir -p /dev/shm/snap
+IN="${PLUGINDIR}/input_file.so -f /dev/shm/snap -n cam_snap.jpg -d 0.04"
 OUT="${PLUGINDIR}/output_http.so -p ${MJPEG_PORT} -w /usr/local/share/mjpg-streamer/www -n"
 
 if [ -n "${MJPEG_AUTH_USER}" ] && [ -n "${MJPEG_AUTH_PASS}" ]; then
