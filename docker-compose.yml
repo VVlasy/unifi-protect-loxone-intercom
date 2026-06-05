@@ -16,10 +16,8 @@ services:
     network_mode: host
     env_file:
       - .env
-    volumes:
-      # Expose Asterisk's logs (incl. the 'security' channel) to the LXC so
-      # fail2ban can watch /opt/doorbell/asterisk-log/security and ban SIP
-      # scanners. entrypoint.sh chowns /var/log/asterisk to the asterisk user,
-      # which propagates to this bind mount, so Asterisk can write here.
-      - ./asterisk-log:/var/log/asterisk
-    # Config is otherwise rendered at boot from env; nothing else persisted.
+    # Everything is rendered at boot from .env; nothing needs to be persisted.
+    # (If you set up the optional fail2ban SIP protection in ADVANCED.md, add a
+    #  bind mount here to expose Asterisk's security log:
+    #    volumes:
+    #      - ./asterisk-log:/var/log/asterisk )

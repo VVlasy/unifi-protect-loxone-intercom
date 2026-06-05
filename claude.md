@@ -55,7 +55,7 @@ Loxone/Asterisk side is **G.711 PCMU** end to end (sdp template + pjsip `allow=u
 - externalMedia uses `ulaw`; RX SDP is PCMU recvonly on `RX_PORT_FROM_ASTERISK`.
 - Bridge spawns go2rtc (`GO2RTC_PATH`/`GO2RTC_CONFIG`, index.js ~line 142).
 - `RING_ENDPOINTS` is mandatory in code (`.split(',')`); unset → crash. Hence the
-  `PJSIP/101` placeholder in `.env.example`.
+  `PJSIP/101` default baked into the Dockerfile `ENV` block.
 
 **Inferred / not published anywhere** (the risk):
 - The Loxone→Asterisk hop: anonymous INVITE → PJSIP `anonymous` endpoint → `9900`.
@@ -112,11 +112,20 @@ curl -s http://<host>:1984/api/streams                                   # go2rt
 ## File map
 
 - `Dockerfile` — Ubuntu 24.04 + asterisk + ffmpeg + node + go2rtc + pinned bridge.
-- `entrypoint.sh` — renders ari.conf password, go2rtc.yaml, SDP from env; execs supervisord.
+  Holds the internal-default `ENV` block (ARI_*, RING_*, DUCK_*, MJPEG_PORT,
+  DOORBELL_EXTENSION, …) that used to live in `.env`.
+- `entrypoint.sh` — validates the 4 PROTECT_* values; **auto-generates ARI_PASS /
+  WEBHOOK_TOKEN** if unset; renders ari.conf password, extensions.conf
+  (`__DOORBELL_EXTENSION__`), go2rtc.yaml, SDP from env; execs supervisord.
 - `supervisord.conf` — asterisk (prio 10) + bridge (prio 20, waits for ARI) + rotation-watchdog (prio 40).
-- `asterisk/` — pjsip (anonymous→from-loxone), extensions (9900→Stasis), ari/http/rtp/modules.
+- `asterisk/` — pjsip (anonymous→from-loxone; remote-access block lives in ADVANCED.md,
+  not baked in), extensions (rendered `DOORBELL_EXTENSION`→Stasis, default 9900),
+  ari/http/rtp/modules.
 - `go2rtc.yaml.template` — audio + video streams from `PROTECT_CAMERA_PATH`.
-- `.env.example` — full env surface (bridge reads these directly; setup.js is NOT used).
+- `.env.example` — **slimmed to the 4 required PROTECT_* values + an optional block**;
+  internal vars are Dockerfile `ENV` defaults (bridge reads env directly; setup.js NOT used).
+- `README.md` — public-facing quickstart. `ADVANCED.md` — LXC, remote SIP, fail2ban,
+  k8s, and the camera-landscape deep-dive (moved out of the README/old DEPLOYMENT-GUIDE).
 - `docker-compose.yml` / `k8s-deployment.yaml` — host-networked deploy.
 - `patches/camera-rotation-watchdog.sh` + `rot90.c`/`rot90.so` + `streamer_wrap.sh` — see below.
 

@@ -90,6 +90,30 @@ ENV GO2RTC_PATH=/app/go2rtc \
     GO2RTC_CONFIG=/app/go2rtc.yaml \
     FFMPEG_PATH=ffmpeg
 
+# --- Internal defaults --------------------------------------------------------
+# These are implementation details, not user config. They were once in .env but
+# never need changing for a normal setup, so they live here to keep .env tiny.
+# Anything here can still be overridden via the environment if you really need to.
+ENV ARI_URL=http://127.0.0.1:8088 \
+    ARI_USER=doorbellari \
+    APP_NAME=doorbellbridge \
+    RX_PORT_FROM_ASTERISK=9999 \
+    DOORBELL_RTSP_AUDIO="rtsp://127.0.0.1:8554/unifi_doorbell?audio" \
+    DOORBELL_EXTENSION=9900 \
+    RING_ENDPOINTS=PJSIP/101 \
+    DOORBELL_CALLERID="Doorbell <9900>" \
+    RING_TIMEOUT_MS=45000 \
+    NO_ANSWER_TIMEOUT_MS=30000 \
+    RING_DELAY_MS=3500 \
+    ENABLE_AGC=1 \
+    DUCK_TALK_THRESHOLD=180 \
+    DUCK_ATTEN_DB=-30 \
+    DUCK_HOLD_MS=900 \
+    MJPEG_PORT=1984 \
+    WEBHOOK_BIND=0.0.0.0 \
+    WEBHOOK_PORT=3000 \
+    WEBHOOK_PATH=/doorbell/ring
+
 # SIP, RTP, mjpg-streamer MJPEG (1984), go2rtc API (1985)/RTSP (8554), webhook.
 # (host networking is strongly recommended; EXPOSE is documentation only in that mode.)
 EXPOSE 5060/udp 10000-10200/udp 1984/tcp 1985/tcp 8554/tcp 3000/tcp

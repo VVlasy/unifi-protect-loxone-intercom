@@ -5,11 +5,12 @@
 # network namespace, so iptables bans here actually drop the forwarded SIP/RTP.
 #
 # SAFETY: ignoreip covers localhost, the LAN and the VPN so we never ban our own
-# clients, the Loxone app on-net, or the admin SSH path (192.168.22.1). Public
-# SIP scanners come from arbitrary internet IPs and are not protected.
+# clients, the Loxone app on-net, or the admin SSH path. EDIT the subnets below to
+# your own LAN/VPN. Public SIP scanners come from arbitrary internet IPs and are
+# not protected.
 
 [DEFAULT]
-ignoreip = 127.0.0.1/8 ::1 192.168.21.0/24 192.168.22.0/24
+ignoreip = 127.0.0.1/8 ::1 192.168.1.0/24 192.168.2.0/24
 bantime  = 3600
 findtime = 1800
 maxretry = 6

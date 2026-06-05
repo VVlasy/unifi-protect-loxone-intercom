@@ -23,26 +23,13 @@ metadata:
   namespace: home
 type: Opaque
 stringData:
+  # Only the four PROTECT_* values are required; everything else has a default
+  # baked into the image and the internal secrets are generated at boot. (Add any
+  # optional override from .env.example here if you need it.)
   PROTECT_CAMERA_PATH: "rtspx://192.168.1.10:7441/CHANGEME"
   PROTECT_BASE: "https://192.168.1.10"
   PROTECT_API_KEY: "CHANGEME"
   CAMERA_ID: "CHANGEME"
-  ARI_URL: "http://127.0.0.1:8088"
-  ARI_USER: "doorbellari"
-  ARI_PASS: "change-me-to-a-long-random-string"
-  APP_NAME: "doorbellbridge"
-  RX_PORT_FROM_ASTERISK: "9999"
-  DOORBELL_RTSP_AUDIO: "rtsp://127.0.0.1:8554/unifi_doorbell?audio"
-  RING_ENDPOINTS: "PJSIP/101"
-  DOORBELL_CALLERID: "Doorbell <9900>"
-  RING_TIMEOUT_MS: "45000"
-  NO_ANSWER_TIMEOUT_MS: "30000"
-  RING_DELAY_MS: "3500"
-  ENABLE_AGC: "1"
-  WEBHOOK_BIND: "0.0.0.0"
-  WEBHOOK_PORT: "3000"
-  WEBHOOK_PATH: "/doorbell/ring"
-  WEBHOOK_TOKEN: "change-me-too"
 ---
 apiVersion: apps/v1
 kind: Deployment

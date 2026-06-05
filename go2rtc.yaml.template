@@ -8,7 +8,7 @@
 #   unifi_doorbell        -> audio only, consumed by the bridge (ffmpeg pulls it)
 #   unifi_doorbell_video  -> raw H264 video; served over go2rtc's local RTSP and
 #                            consumed by mjpeg-video.sh (ffmpeg -> mjpg-streamer).
-#                            Loxone's MJPEG comes from mjpg-streamer (:8080), not
+#                            Loxone's MJPEG comes from mjpg-streamer (:1984), not
 #                            go2rtc, so no MJPEG transcode stream is defined here.
 streams:
   unifi_doorbell:

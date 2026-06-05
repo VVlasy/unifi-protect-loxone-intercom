@@ -3,15 +3,43 @@ set -euo pipefail
 
 # ---------------------------------------------------------------------------
 # Render runtime configuration from environment variables, then start everything
-# under supervisord. Nothing here needs editing; drive it all from the .env file.
+# under supervisord. For a normal setup you only set the four PROTECT_* values in
+# .env; everything else has a sensible default (baked into the image) and the
+# internal secrets below are auto-generated.
 # ---------------------------------------------------------------------------
 
-: "${ARI_PASS:?ARI_PASS must be set}"
-: "${PROTECT_CAMERA_PATH:?PROTECT_CAMERA_PATH must be set (rtspx://IP:7441/KEY)}"
+# --- Required user config: the four things only you can know ----------------
+missing=0
+for v in PROTECT_CAMERA_PATH PROTECT_BASE PROTECT_API_KEY CAMERA_ID; do
+  if [ -z "${!v:-}" ] || [[ "${!v:-}" == *CHANGEME* ]]; then
+    echo "[entrypoint] ERROR: ${v} is not set (edit your .env)."
+    missing=1
+  fi
+done
+if [ "$missing" = "1" ]; then
+  echo "[entrypoint] Refusing to start until the PROTECT_* values are filled in."
+  exit 1
+fi
+
+# --- Auto-generated internal secrets ----------------------------------------
+# These never leave the box (ARI is localhost-only; the webhook token only
+# matters if you point Protect at the bridge's own ring webhook). Generate them
+# once at boot so the user never has to. Export so supervisord's children (the
+# bridge, the ARI healthcheck) inherit them.
+# base64 of 24 random bytes is ~32 chars; tr drops +// so ~28-32 alnum remain.
+# (No trailing `head -c` — closing the pipe early would SIGPIPE under pipefail.)
+: "${ARI_PASS:=$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')}"
+: "${WEBHOOK_TOKEN:=$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9')}"
+export ARI_PASS WEBHOOK_TOKEN
+
 : "${RX_PORT_FROM_ASTERISK:=9999}"
+: "${DOORBELL_EXTENSION:=9900}"
 
 echo "[entrypoint] Rendering Asterisk ARI password..."
 sed -i "s|__ARI_PASS__|${ARI_PASS}|g" /etc/asterisk/ari.conf
+
+echo "[entrypoint] Rendering dialplan for extension ${DOORBELL_EXTENSION}..."
+sed -i "s|__DOORBELL_EXTENSION__|${DOORBELL_EXTENSION}|g" /etc/asterisk/extensions.conf
 
 echo "[entrypoint] Rendering go2rtc.yaml from PROTECT_CAMERA_PATH..."
 # '|' delimiter because the path contains slashes/colons
