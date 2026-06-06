@@ -118,9 +118,11 @@ curl -s http://<host>:1984/api/streams                                   # go2rt
   WEBHOOK_TOKEN** if unset; renders ari.conf password, extensions.conf
   (`__DOORBELL_EXTENSION__`), go2rtc.yaml, SDP from env; execs supervisord.
 - `supervisord.conf` — asterisk (prio 10) + bridge (prio 20, waits for ARI) + rotation-watchdog (prio 40).
-- `asterisk/` — pjsip (anonymous→from-loxone; remote-access block lives in ADVANCED.md,
-  not baked in), extensions (rendered `DOORBELL_EXTENSION`→Stasis, default 9900),
-  ari/http/rtp/modules.
+- `asterisk/` — pjsip (anonymous→from-loxone; `#include pjsip_transport_extra.conf`,
+  which entrypoint renders from `SIP_EXTERNAL_ADDRESS`/`SIP_LOCAL_NET` — empty =
+  LAN-only), extensions (rendered `DOORBELL_EXTENSION`→Stasis, default 9900),
+  ari/http/rtp/modules. **Every user-facing asterisk setting is now env-driven** (no
+  hand-edited files) so .env / a future HA-addon options map is the single source.
 - `go2rtc.yaml.template` — audio + video streams from `PROTECT_CAMERA_PATH`.
 - `.env.example` — **slimmed to the 4 required PROTECT_* values + an optional block**;
   internal vars are Dockerfile `ENV` defaults (bridge reads env directly; setup.js NOT used).

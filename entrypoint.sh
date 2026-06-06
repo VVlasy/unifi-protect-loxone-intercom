@@ -41,6 +41,24 @@ sed -i "s|__ARI_PASS__|${ARI_PASS}|g" /etc/asterisk/ari.conf
 echo "[entrypoint] Rendering dialplan for extension ${DOORBELL_EXTENSION}..."
 sed -i "s|__DOORBELL_EXTENSION__|${DOORBELL_EXTENSION}|g" /etc/asterisk/extensions.conf
 
+# Optional remote-access transport settings (#included by pjsip.conf). Empty file
+# = LAN/VPN-only. Driven entirely by env so .env / addon options are the single
+# point of edit; no need to touch the baked-in pjsip.conf.
+echo "[entrypoint] Rendering SIP transport extras..."
+{
+  if [ -n "${SIP_EXTERNAL_ADDRESS:-}" ]; then
+    echo "external_media_address = ${SIP_EXTERNAL_ADDRESS}"
+    echo "external_signaling_address = ${SIP_EXTERNAL_ADDRESS}"
+  fi
+  if [ -n "${SIP_LOCAL_NET:-}" ]; then
+    IFS=',' read -ra _nets <<< "${SIP_LOCAL_NET}"
+    for _n in "${_nets[@]}"; do
+      _n="$(echo "${_n}" | tr -d '[:space:]')"
+      [ -n "${_n}" ] && echo "local_net = ${_n}"
+    done
+  fi
+} > /etc/asterisk/pjsip_transport_extra.conf
+
 echo "[entrypoint] Rendering go2rtc.yaml from PROTECT_CAMERA_PATH..."
 # '|' delimiter because the path contains slashes/colons
 sed "s|__PROTECT_CAMERA_PATH__|${PROTECT_CAMERA_PATH}|g" \
