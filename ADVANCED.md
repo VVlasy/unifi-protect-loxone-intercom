@@ -114,24 +114,6 @@ uses a node's real IP, **pin it to one node** so the IP Loxone calls stays stabl
 
 ---
 
-## Camera landscape fix (separate project)
-
-UniFi doorbells hardcode a 90° portrait ("hallway") rotation that Protect cannot
-disable. Fixing it **at the source** (so Protect, the recordings *and* the Loxone
-feed are all landscape) is its own project, packaged as a Home Assistant app with
-a docker compose fallback:
-
-**https://github.com/VVlasy/unifi-doorbell-landscape**
-
-It does not affect the SIP/video bridge. Two notes for this repo:
-
-- If you run the fix, keep **`MJPEG_TRANSPOSE=`** (empty) so the Loxone feed isn't
-  double-rotated — the source is already landscape.
-- If you keep the doorbell stock and only need *Loxone's* view rotated, set
-  `MJPEG_TRANSPOSE` instead.
-
----
-
 ## Debugging cheatsheet
 
 ```bash

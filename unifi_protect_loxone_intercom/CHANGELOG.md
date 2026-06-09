@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1
+
+- New `debug_sip` option: logs every SIP message and RTP packet to the app
+  log (PJSIP logger + RTP debug) for diagnosing call/audio problems without
+  needing `docker exec`. Extremely noisy — enable only while debugging.
+
 ## 1.0.0
 
 - First release as a Home Assistant app (add-on). Same image as the

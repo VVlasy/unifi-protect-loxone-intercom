@@ -50,10 +50,9 @@ configuration:
   mjpeg_rotation:
     name: Video rotation
     description: >-
-      Rotate the MJPEG feed for consumers. If you run the
-      unifi-doorbell-landscape rotation fix on the camera, keep this at
-      "none" (the source is already landscape; rotating again would
-      double-rotate).
+      Rotate the MJPEG feed for consumers. If your camera already outputs
+      landscape (rotation fixed at the source), keep this at "none" —
+      rotating again would double-rotate.
   mjpeg_auth_user:
     name: Video basic-auth user
     description: >-
@@ -78,3 +77,9 @@ configuration:
     description: >-
       Stay ducked this long after talk stops (covers word gaps). Image
       default 900.
+  debug_sip:
+    name: SIP/RTP debug logging
+    description: >-
+      Logs every SIP message and RTP packet to the app log (PJSIP logger +
+      RTP debug). Extremely noisy — enable only while diagnosing call/audio
+      problems, then turn it off again.

@@ -112,8 +112,8 @@ curl -s http://<host>:1984/api/streams                                   # go2rt
 ## File map
 
 The repo doubles as a **Home Assistant add-on repository** (root
-`repository.yaml` + add-on folder `unifi_protect_loxone_intercom/`, mirroring
-`../unifi-doorbell-landscape`). All build assets live INSIDE the add-on folder
+`repository.yaml` + add-on folder `unifi_protect_loxone_intercom/`). All
+build assets live INSIDE the add-on folder
 (= the build context for both the HA Supervisor and docker-compose);
 `.env.example`, `docker-compose.yml`, `k8s-deployment.yaml`, `fail2ban/` and the
 docs stay at the root. Paths below are relative to `unifi_protect_loxone_intercom/`.
@@ -147,14 +147,9 @@ docs stay at the root. Paths below are relative to `unifi_protect_loxone_interco
 - `docker-compose.yml` / `k8s-deployment.yaml` — host-networked deploy.
 - `patches/duck-soft-attenuation.js` — build-time patch of the vendored bridge (soft ducking).
 
-## Camera rotation (landscape) fix — MOVED to its own repo
+## Camera orientation
 
-The on-camera landscape rotation fix (LD_PRELOAD hallwayMode override + ISP 180°
-flip + SSH watchdog) was split out into a standalone project packaged as a Home
-Assistant app: https://github.com/VVlasy/unifi-doorbell-landscape (local path:
-`../unifi-doorbell-landscape`). All engineering notes and hard-won gotchas
-(SIGTERM-only streamer restarts, cfgmtd persistence wipe, glibc 2.30 linking)
-moved with it — see that repo's DOCS.md and script headers. The only interaction
-left in this repo: if the fix is active, keep `MJPEG_TRANSPOSE` empty (the source
-is already landscape; transposing would double-rotate). The video-watchdog's
-orientation check handles the camera flipping between portrait/landscape at runtime.
+If the camera's rotation is fixed at the source (camera already outputs
+landscape), keep `MJPEG_TRANSPOSE` / `mjpeg_rotation` at none — transposing
+would double-rotate. The video-watchdog's orientation check handles the camera
+flipping between portrait/landscape at runtime.

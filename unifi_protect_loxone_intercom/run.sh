@@ -44,6 +44,7 @@ if [ -f /data/options.json ]; then
     setenv DUCK_TALK_THRESHOLD  duck_talk_threshold
     setenv DUCK_ATTEN_DB        duck_atten_db
     setenv DUCK_HOLD_MS         duck_hold_ms
+    setenv DEBUG_SIP            debug_sip
 
     # mjpeg_rotation dropdown -> ffmpeg transpose chain
     # (transpose=1 is 90° clockwise, 2 is 90° counter-clockwise, "1,1" is 180°)

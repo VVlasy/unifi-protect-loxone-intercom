@@ -73,5 +73,25 @@ sed "s|{{RX_PORT_FROM_ASTERISK}}|${RX_PORT_FROM_ASTERISK}|g" \
 mkdir -p /var/run/asterisk /var/log/asterisk /var/lib/asterisk
 chown -R asterisk:asterisk /var/run/asterisk /var/log/asterisk /var/lib/asterisk 2>/dev/null || true
 
+# --- optional SIP/RTP debugging (DEBUG_SIP=true / addon option debug_sip) ----
+# Enables the PJSIP packet logger + per-packet RTP debug on the Asterisk
+# console once Asterisk is up; everything lands in the container log. VERY
+# noisy (every SIP message and RTP packet) — for debugging sessions only.
+# Runs in the background so it survives the exec below (children are kept).
+if [ "${DEBUG_SIP:-}" = "true" ] || [ "${DEBUG_SIP:-}" = "1" ]; then
+  (
+    for _ in $(seq 1 60); do
+      if asterisk -rx "core waitfullybooted" >/dev/null 2>&1; then
+        asterisk -rx "pjsip set logger on" >/dev/null 2>&1
+        asterisk -rx "rtp set debug on" >/dev/null 2>&1
+        echo "[entrypoint] DEBUG_SIP: pjsip logger + rtp debug ENABLED (expect a very noisy log)"
+        exit 0
+      fi
+      sleep 2
+    done
+    echo "[entrypoint] DEBUG_SIP: gave up waiting for Asterisk to boot"
+  ) &
+fi
+
 echo "[entrypoint] Starting supervisord..."
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf

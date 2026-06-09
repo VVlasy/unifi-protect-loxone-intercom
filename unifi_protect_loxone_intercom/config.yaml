@@ -1,5 +1,5 @@
 ---
-version: 1.0.0
+version: 1.0.1
 name: UniFi Protect Loxone Intercom
 slug: unifi_protect_loxone_intercom
 description: >-
@@ -35,6 +35,7 @@ options:
   mjpeg_rotation: none
   sip_external_address: ""
   sip_local_net: ""
+  debug_sip: false
 schema:
   # --- Required: UniFi Protect (same four values as .env in standalone mode)
   protect_camera_path: str
@@ -62,3 +63,5 @@ schema:
   duck_talk_threshold: int?
   duck_atten_db: int?
   duck_hold_ms: int(0,5000)?
+  # --- Debugging
+  debug_sip: bool

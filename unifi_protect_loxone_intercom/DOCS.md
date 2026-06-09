@@ -65,10 +65,8 @@ Fill those four options, start the app, and watch the log for
 Internal secrets (ARI password, webhook token) are generated automatically
 at boot; nothing is persisted.
 
-If you run the
-[unifi-doorbell-landscape](https://github.com/VVlasy/unifi-doorbell-landscape)
-rotation fix on the camera, keep `mjpeg_rotation: none` — the source is
-already landscape and rotating again would double-rotate.
+If your camera already outputs landscape (rotation fixed at the source),
+keep `mjpeg_rotation: none` — rotating again would double-rotate.
 
 
 ## Prove the audio leg FIRST (before Loxone)

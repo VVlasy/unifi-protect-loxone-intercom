@@ -31,12 +31,6 @@ to reach the doorbell's talkback over Protect's official Integration API, and
 The doorbell **ring → Loxone** notification is done separately and more robustly
 via a Protect **Alarm Manager webhook → Loxone Virtual Input** (see step 6).
 
-UniFi doorbells are portrait-locked; if you want the doorbell to output
-**landscape** like your other cameras, that fix lives in its own project:
-[unifi-doorbell-landscape](https://github.com/VVlasy/unifi-doorbell-landscape)
-(a Home Assistant app, with a docker compose option). If you run it, leave
-`MJPEG_TRANSPOSE` empty here so the Loxone feed isn't double-rotated.
-
 ---
 
 ## 1. What you need
@@ -183,10 +177,6 @@ LAN.
   Loxone chain is new. Step 5 is there to de-risk it.
 - **The bridge** is a solo, low-traffic project; the commit is pinned in the
   Dockerfile. Expect to read code if something is off.
-- The **landscape rotation fix** (overriding the doorbell's hardcoded portrait
-  rotation) is a separate, even more experimental project:
-  [unifi-doorbell-landscape](https://github.com/VVlasy/unifi-doorbell-landscape).
-  It does not affect the SIP/video bridge.
 
 ## License / credit
 
