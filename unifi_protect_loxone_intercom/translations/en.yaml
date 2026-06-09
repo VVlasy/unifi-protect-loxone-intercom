@@ -77,6 +77,13 @@ configuration:
     description: >-
       Stay ducked this long after talk stops (covers word gaps). Image
       default 900.
+  max_call_secs:
+    name: Max call duration (seconds)
+    description: >-
+      Hard cap on a talk session — the call is hung up after this long no
+      matter what (stuck-call protection; catches sessions whose hangup never
+      arrived even while audio packets still flow). Default 600 (10 min),
+      0 disables. A separate 30-second no-RTP timeout always applies.
   debug_sip:
     name: SIP/RTP debug logging
     description: >-

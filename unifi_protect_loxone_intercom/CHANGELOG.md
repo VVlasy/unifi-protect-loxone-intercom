@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.2
+
+- Stuck-call protection, two layers: a 30 s no-RTP timeout on the SIP
+  endpoint (caller vanished without a deliverable BYE), and an absolute cap
+  on call duration — new `max_call_secs` option, default 600 s, 0 disables —
+  for zombie sessions that keep streaming RTP so the no-RTP timeout never
+  fires. Either one hangs the channel up, which triggers the bridge's normal
+  session cleanup.
+
 ## 1.0.1
 
 - New `debug_sip` option: logs every SIP message and RTP packet to the app

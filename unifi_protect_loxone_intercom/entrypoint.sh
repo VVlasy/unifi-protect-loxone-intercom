@@ -38,8 +38,9 @@ export ARI_PASS WEBHOOK_TOKEN
 echo "[entrypoint] Rendering Asterisk ARI password..."
 sed -i "s|__ARI_PASS__|${ARI_PASS}|g" /etc/asterisk/ari.conf
 
-echo "[entrypoint] Rendering dialplan for extension ${DOORBELL_EXTENSION}..."
+echo "[entrypoint] Rendering dialplan for extension ${DOORBELL_EXTENSION} (max call ${MAX_CALL_SECS:-600}s)..."
 sed -i "s|__DOORBELL_EXTENSION__|${DOORBELL_EXTENSION}|g" /etc/asterisk/extensions.conf
+sed -i "s|__MAX_CALL_SECS__|${MAX_CALL_SECS:-600}|g" /etc/asterisk/extensions.conf
 
 # Optional remote-access transport settings (#included by pjsip.conf). Empty file
 # = LAN/VPN-only. Driven entirely by env so .env / addon options are the single

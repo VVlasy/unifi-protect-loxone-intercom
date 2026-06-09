@@ -1,5 +1,5 @@
 ---
-version: 1.0.1
+version: 1.0.2
 name: UniFi Protect Loxone Intercom
 slug: unifi_protect_loxone_intercom
 description: >-
@@ -63,5 +63,8 @@ schema:
   duck_talk_threshold: int?
   duck_atten_db: int?
   duck_hold_ms: int(0,5000)?
+  # Stuck-call protection: absolute cap on call duration (0 disables).
+  # Image default 600. A 30s no-RTP timeout is always active in pjsip.conf.
+  max_call_secs: int(0,7200)?
   # --- Debugging
   debug_sip: bool
