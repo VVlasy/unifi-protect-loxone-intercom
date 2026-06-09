@@ -1,0 +1,64 @@
+---
+version: 1.0.0
+name: UniFi Protect Loxone Intercom
+slug: unifi_protect_loxone_intercom
+description: >-
+  Two-way audio + MJPEG video bridge between a UniFi Protect doorbell and a
+  Loxone Intercom block. Bundles Asterisk (answers the Loxone SIP call), the
+  Fusseldieb Protect bridge, go2rtc and mjpg-streamer in one supervised app.
+url: https://github.com/VVlasy/unifi-protect-loxone-intercom
+arch:
+  - amd64
+  - aarch64
+# Prebuilt by .github/workflows/builder.yaml; the version above must exist as
+# a tag on this image before users can install/update (the workflow publishes
+# on every push to master that touches this folder).
+image: ghcr.io/vvlasy/unifi-protect-loxone-intercom
+init: false
+startup: application
+boot: auto
+stage: stable
+# SIP advertises IP/ports inside SDP and RTP is symmetric; behind Docker's NAT
+# bridge the audio silently breaks. Host networking is REQUIRED — the add-on
+# uses the Home Assistant host's LAN IP directly, which is also the IP you
+# give Loxone as "Host for audio".
+host_network: true
+options:
+  protect_camera_path: ""
+  protect_base: ""
+  protect_api_key: ""
+  camera_id: ""
+  doorbell_extension: "9900"
+  mjpeg_fps: 10
+  mjpeg_scale_w: 1280
+  mjpeg_quality: 8
+  mjpeg_rotation: none
+  sip_external_address: ""
+  sip_local_net: ""
+schema:
+  # --- Required: UniFi Protect (same four values as .env in standalone mode)
+  protect_camera_path: str
+  protect_base: str
+  protect_api_key: password
+  camera_id: str
+  # --- SIP
+  doorbell_extension: str
+  # Remote access (calling in from OFF the LAN, no VPN). Leave empty for
+  # LAN/VPN-only. See ADVANCED.md in the repository.
+  sip_external_address: str
+  sip_local_net: str
+  # --- Video (MJPEG served to Loxone on :1984)
+  mjpeg_fps: int(1,30)
+  mjpeg_scale_w: int(160,1920)
+  mjpeg_quality: int(1,31)
+  mjpeg_rotation: list(none|90cw|90ccw|180)
+  # Basic auth on the video stream (set BOTH to enable; plain HTTP, keep
+  # LAN/VPN-only). Optional: no default, hidden unless filled.
+  mjpeg_auth_user: str?
+  mjpeg_auth_pass: password?
+  # --- Echo / ducking tuning (defaults baked into the image: 180 / -30 / 900)
+  # (plain int: duck_atten_db is negative and the Supervisor's int(min,max)
+  #  range syntax is only documented for non-negative bounds)
+  duck_talk_threshold: int?
+  duck_atten_db: int?
+  duck_hold_ms: int(0,5000)?

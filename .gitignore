@@ -1,0 +1,21 @@
+# Secrets / local runtime config — NEVER commit (real API keys, passwords,
+# camera recovery code, stream key, webhook token live here).
+.env
+.env.local
+
+# Debug/snapshot images captured during development (show the camera's view).
+*.jpg
+*.jpeg
+*.png
+# ...but the HA app store icon/logo must be committed:
+!unifi_protect_loxone_intercom/icon.png
+!unifi_protect_loxone_intercom/logo.png
+
+# Runtime logs (bind-mounted from the container).
+asterisk-log/
+
+# Editor / OS cruft
+*.bak
+*.tmp
+.DS_Store
+Thumbs.db

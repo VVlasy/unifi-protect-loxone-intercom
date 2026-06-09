@@ -1,0 +1,25 @@
+#==============================================================================
+# Proxmox / any Docker host.
+#
+# host networking is REQUIRED. SIP advertises IP/ports inside SDP and RTP is
+# symmetric; behind Docker's NAT bridge the audio silently breaks. With
+# network_mode: host the container uses the host's LAN IP directly - which is
+# also the IP you give Loxone as "Host for audio".
+#==============================================================================
+services:
+  doorbell-bridge:
+    # Build context = the Home Assistant app folder (same image both ways;
+    # run.sh falls back to plain env vars when /data/options.json is absent).
+    build: ./unifi_protect_loxone_intercom
+    # Or use the prebuilt image instead of build:
+    # image: ghcr.io/vvlasy/unifi-protect-loxone-intercom:latest
+    container_name: unifi-loxone-doorbell
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    # Everything is rendered at boot from .env; nothing needs to be persisted.
+    # (If you set up the optional fail2ban SIP protection in ADVANCED.md, add a
+    #  bind mount here to expose Asterisk's security log:
+    #    volumes:
+    #      - ./asterisk-log:/var/log/asterisk )

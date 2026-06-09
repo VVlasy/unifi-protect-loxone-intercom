@@ -1,0 +1,24 @@
+# fail2ban jail for the doorbell Asterisk, watching the security-event log that
+# is bind-mounted out of the container to /opt/doorbell/asterisk-log/security.
+#
+# Runs in the LXC; because the container uses host networking it shares the LXC
+# network namespace, so iptables bans here actually drop the forwarded SIP/RTP.
+#
+# SAFETY: ignoreip covers localhost, the LAN and the VPN so we never ban our own
+# clients, the Loxone app on-net, or the admin SSH path. EDIT the subnets below to
+# your own LAN/VPN. Public SIP scanners come from arbitrary internet IPs and are
+# not protected.
+
+[DEFAULT]
+ignoreip = 127.0.0.1/8 ::1 192.168.1.0/24 192.168.2.0/24
+bantime  = 3600
+findtime = 1800
+maxretry = 6
+banaction = iptables-allports
+
+[asterisk]
+enabled  = true
+filter   = asterisk
+logpath  = /opt/doorbell/asterisk-log/security
+port     = 5060,5061
+protocol = udp

@@ -1,0 +1,80 @@
+configuration:
+  protect_camera_path:
+    name: Protect camera RTSPS path
+    description: >-
+      The RTSPS "share" link of the doorbell, e.g.
+      rtspx://192.168.1.10:7441/KEY. Enable it under Protect > doorbell >
+      Settings > Advanced > RTSP.
+  protect_base:
+    name: Protect controller URL
+    description: >-
+      Base URL of the Protect controller (UDM/Cloud Key), usually
+      https://<protect-ip>.
+  protect_api_key:
+    name: Protect API key
+    description: >-
+      Integration API key. Create under Protect > Settings > Control Plane >
+      Integrations > Create.
+  camera_id:
+    name: Doorbell camera id
+    description: >-
+      From the Protect URL when the doorbell is open:
+      https://<ip>/protect/devices/<CAMERA_ID>.
+  doorbell_extension:
+    name: SIP extension (Loxone "Audio username")
+    description: >-
+      Default 9900. If you expose SIP to the internet, set a longer,
+      non-obvious number and use the same value as Loxone's "Audio username".
+  sip_external_address:
+    name: SIP external address (remote access)
+    description: >-
+      Leave empty for LAN/VPN-only (the default). To accept calls from the
+      internet, set your PUBLIC name/IP as it resolves from this host, list
+      your private subnets below, and port-forward 5060/udp +
+      10000-10200/udp. See ADVANCED.md in the repository.
+  sip_local_net:
+    name: SIP local networks (remote access)
+    description: >-
+      Comma-separated private subnets (e.g. 192.168.1.0/24,192.168.2.0/24) so
+      on-net clients stay on the private path. Only needed together with the
+      external address.
+  mjpeg_fps:
+    name: Video FPS
+    description: Frame rate of the MJPEG stream served to Loxone on :1984.
+  mjpeg_scale_w:
+    name: Video width (px)
+    description: Output width of the MJPEG stream; height follows the aspect ratio.
+  mjpeg_quality:
+    name: Video JPEG quality
+    description: "ffmpeg -q:v value: lower is better quality / more bandwidth (2-10 typical)."
+  mjpeg_rotation:
+    name: Video rotation
+    description: >-
+      Rotate the MJPEG feed for consumers. If you run the
+      unifi-doorbell-landscape rotation fix on the camera, keep this at
+      "none" (the source is already landscape; rotating again would
+      double-rotate).
+  mjpeg_auth_user:
+    name: Video basic-auth user
+    description: >-
+      Set BOTH user and password to require basic auth on the video stream
+      (plain HTTP — keep it LAN/VPN-only). Loxone URL then becomes
+      http://user:pass@<host>:1984/?action=stream.
+  mjpeg_auth_pass:
+    name: Video basic-auth password
+    description: See video basic-auth user.
+  duck_talk_threshold:
+    name: Ducking talk threshold (advanced)
+    description: >-
+      Talk-detect level on the caller leg that triggers ducking of the
+      doorbell loudspeaker audio. Image default 180.
+  duck_atten_db:
+    name: Ducking attenuation (advanced)
+    description: >-
+      VOLUME(TX) linear divisor, NOT dB (-5 = /5 ... -30 = near silent).
+      Image default -30.
+  duck_hold_ms:
+    name: Ducking hold (ms, advanced)
+    description: >-
+      Stay ducked this long after talk stops (covers word gaps). Image
+      default 900.
