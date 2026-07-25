@@ -100,7 +100,11 @@ fed by the relay's own `relay_security` log.
    loopback bind back to 0.0.0.0:5060 in relay mode — the two would fight
    over the port — and don't remove the relay without restoring the direct
    bind, or SIP dies entirely. NFQUEUE is a known dead end on HAOS (no
-   nfnetlink_queue kernel module); don't reintroduce it.
+   nfnetlink_queue kernel module); don't reintroduce it. `chan_sip.so` must
+   stay `noload`ed in modules.conf (1.0.5): it defaults to binding
+   0.0.0.0:5060 and, with PJSIP off that port, stole it from the relay via
+   SO_REUSEADDR and blackholed all calls. The relay's bind is deliberately
+   exclusive (no SO_REUSEADDR) for the same reason.
 
 ## Refinement backlog (priority order)
 

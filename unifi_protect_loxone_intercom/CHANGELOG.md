@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.5
+
+- Fix 1.0.4 relay mode being dead on arrival: Ubuntu's Asterisk autoloads the
+  deprecated legacy `chan_sip` driver, which binds `0.0.0.0:5060` by default.
+  Pre-1.0.4 it silently lost that bind race to PJSIP; with PJSIP moved to
+  `127.0.0.1:5070` it instead stole `:5060` from the SDP relay (both sockets
+  had `SO_REUSEADDR`; on Linux UDP the last binder receives everything) and
+  blackholed every call in its empty `public` context — while also answering
+  scanners' REGISTER attempts. Two fixes: `chan_sip` is now explicitly
+  `noload`ed in `modules.conf`, and the relay binds `:5060` exclusively
+  (no `SO_REUSEADDR`) so any future port conflict fails loudly at startup
+  instead of silently swallowing calls.
+
 ## 1.0.4
 
 - Replace the 1.0.3 NFQUEUE-based SDP fix, which could not work on Home
