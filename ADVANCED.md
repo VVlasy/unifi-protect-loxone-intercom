@@ -50,11 +50,12 @@ the phone is the more secure alternative.
    the default `9900` to something long and non-guessable: set
    `DOORBELL_EXTENSION=<your-number>` in `.env`, and use the **same** value as the
    Loxone "Audio username".
-2. **Advertise the public address** — set these in `.env` (no file edits; the
-   entrypoint renders them into Asterisk). Use a **public-only** name that resolves to
-   your WAN IP *from the host* — not a split-horizon name, which the host would
-   resolve to the private IP. `SIP_LOCAL_NET` lists your private subnets (LAN, VPN) so
-   on-net clients stay on the private path:
+2. **Advertise the public address** — set these in `.env` (no file edits). A
+   split-horizon name (resolving to the LAN IP from inside) is fine: the SDP
+   relay detects a non-public resolution and advertises the hostname itself,
+   letting each caller resolve it from their own vantage point.
+   `SIP_LOCAL_NET` lists your private subnets (LAN, VPN) so on-net clients
+   stay on the private path:
    ```ini
    SIP_EXTERNAL_ADDRESS=your-public-name.example.com
    SIP_LOCAL_NET=192.168.1.0/24,192.168.2.0/24

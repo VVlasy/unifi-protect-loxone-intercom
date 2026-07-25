@@ -127,13 +127,24 @@ def lan_ip_toward(client_ip):
 _dns_cache = (None, 0.0)
 
 
+_warned_split_horizon = False
+
+
 def external_addr():
-    """SIP_EXTERNAL_ADDRESS resolved to an IPv4 literal (cached), falling back
-    to the hostname text itself if resolution fails."""
-    global _dns_cache
+    """SIP_EXTERNAL_ADDRESS resolved to a PUBLIC IPv4 literal (cached).
+
+    Falls back to the hostname text itself when resolution fails OR when the
+    host's DNS returns a non-global address (split-horizon DNS resolving the
+    public name to the LAN IP). A remote caller sends its 2xx ACK and BYE to
+    the Contact we advertise; a private address there is a blackhole - the
+    call establishes but can never be torn down, and the bridge then declines
+    quick redials while the zombie session drains. With the hostname literal
+    the CALLER resolves it from its own vantage point, which is always right.
+    """
+    global _dns_cache, _warned_split_horizon
     try:
         ipaddress.ip_address(EXTERNAL_ADDRESS)
-        return EXTERNAL_ADDRESS
+        return EXTERNAL_ADDRESS  # explicit IP literal: user's choice, trust it
     except ValueError:
         pass
     value, ts = _dns_cache
@@ -142,13 +153,21 @@ def external_addr():
         return value
     try:
         resolved = socket.gethostbyname(EXTERNAL_ADDRESS)
-        _dns_cache = (resolved, now)
-        return resolved
     except OSError:
         if value is not None:
             return value
         log("DNS resolution of %s failed; using the hostname literally" % EXTERNAL_ADDRESS)
         return EXTERNAL_ADDRESS
+    if not ipaddress.ip_address(resolved).is_global:
+        if not _warned_split_horizon:
+            _warned_split_horizon = True
+            log("split-horizon DNS detected: %s resolves to %s here, which "
+                "remote callers cannot reach; advertising the hostname "
+                "instead and letting callers resolve it themselves"
+                % (EXTERNAL_ADDRESS, resolved))
+        resolved = EXTERNAL_ADDRESS
+    _dns_cache = (resolved, now)
+    return resolved
 
 
 def advertised_for(client_ip):
@@ -186,13 +205,20 @@ def sanitize_to_asterisk(data):
     return set_content_length(headers, len(fixed)) + sep + fixed
 
 
-def rewrite_to_client(data, client_ip):
+def rewrite_to_client(data, client_addr, sess_port):
     """Replace Asterisk's loopback self-references with the address this
-    caller must use, in both SIP headers and the SDP body."""
+    caller must use, in both SIP headers and the SDP body. Also undo the
+    received=/rport= Via params Asterisk stamped with our loopback session
+    socket - the caller uses those for NAT self-discovery, and telling a
+    pjsua client its public address is 127.0.0.1 invites trouble."""
+    client_ip, client_port = client_addr
     adv = advertised_for(client_ip).encode()
     headers, sep, body = split_message(data)
     headers = headers.replace(
         b"127.0.0.1:%d" % ASTERISK_ADDR[1], adv + b":%d" % RELAY_PORT)
+    headers = headers.replace(
+        b"rport=%d;received=127.0.0.1" % sess_port,
+        b"rport=%d;received=%s" % (client_port, client_ip.encode()))
     if body:
         new_body = body.replace(b"127.0.0.1", adv)
         if new_body != body:
@@ -332,7 +358,8 @@ def main():
                         # down; socket stays usable for the retransmit.
                         break
                     sess.last_active = now
-                    out = rewrite_to_client(data, sess.client_addr[0])
+                    out = rewrite_to_client(
+                        data, sess.client_addr, sess.sock.getsockname()[1])
                     log_security(out, sess.client_addr)
                     try:
                         main_sock.sendto(out, sess.client_addr)

@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.6
+
+- Fix zombie calls + "declined" on quick redial in relay mode. The relay
+  resolved `sip_external_address` with the host's DNS; with split-horizon
+  DNS (public name → LAN IP from inside the network) the Contact handed to
+  remote callers pointed at a private address. The call established (that
+  path doesn't use Contact), but the caller's 2xx ACK and, on hang-up, its
+  BYE went to the unreachable Contact and vanished — the channel lingered
+  as a zombie until the 30 s no-RTP timeout, and the bridge declines new
+  calls while a session is active, so redialing within that window got
+  `603 Decline`. The relay now detects a non-public resolution and
+  advertises the hostname itself instead, letting each caller resolve it
+  from their own vantage point (correct in both split-horizon and plain
+  setups).
+- Relay responses now restore the real caller address in the Via
+  `received=`/`rport=` parameters instead of leaking the loopback session
+  socket (`received=127.0.0.1`), which fed the caller's NAT self-discovery
+  nonsense.
+
 ## 1.0.5
 
 - Fix 1.0.4 relay mode being dead on arrival: Ubuntu's Asterisk autoloads the

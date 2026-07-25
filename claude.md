@@ -81,7 +81,13 @@ in the boot log), which is why 1.0.4 replaced it with the `sdp-relay`
 userspace component above. See ADVANCED.md "Known issue: Loxone's
 remote-call client sends invalid SDP". Relay-mode side effect: Asterisk only
 sees 127.0.0.1 sources, so fail2ban gained a `doorbell-relay` filter/jail
-fed by the relay's own `relay_security` log.
+fed by the relay's own `relay_security` log. **1.0.6 (live-capture-confirmed):
+in-dialog requests (2xx ACK, BYE) go to the Contact the relay advertises —
+if `SIP_EXTERNAL_ADDRESS` resolves to a private IP on the host (split-horizon
+DNS), that Contact is a blackhole for remote callers: calls establish but
+can't be torn down, and the bridge 603-declines redials until the 30 s
+no-RTP timeout reaps the zombie. The relay now falls back to advertising
+the hostname literal whenever the local resolution is non-global.**
 
 ## Guardrails — do not regress these
 
