@@ -80,6 +80,22 @@ RUN set -eux; \
     ldconfig; \
     rm -rf /tmp/mjpg /var/lib/apt/lists/*
 
+# --- SDP sanitizer (NFQUEUE) for remote access --------------------------------
+# Works around a Loxone remote-call SIP client bug (malformed SDP bandwidth
+# lines on the cloud-relayed off-LAN call path) that Asterisk's SDP parser
+# rejects outright. Only ever queues traffic when SIP_EXTERNAL_ADDRESS is set
+# (entrypoint.sh installs the iptables rule); otherwise this sits idle. See
+# sip_sdp_fixup.py and ADVANCED.md > Remote access.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        iptables \
+        python3 \
+        python3-pip \
+        python3-dev \
+        libnetfilter-queue-dev \
+    && pip3 install --break-system-packages --no-cache-dir NetfilterQueue \
+    && rm -rf /var/lib/apt/lists/*
+COPY sip_sdp_fixup.py /app/sip_sdp_fixup.py
+
 # --- our config & glue -------------------------------------------------------
 COPY asterisk/         /etc/asterisk/
 COPY go2rtc.yaml.template /app/go2rtc.yaml.template
