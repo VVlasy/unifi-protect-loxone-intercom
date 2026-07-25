@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.7
+
+- Relay call visibility: one log line per new SIP peer
+  (`[sdp-relay] new peer <ip>:<port> (local|external): INVITE sip:...`),
+  so "did the call even reach this box?" is answerable from the normal app
+  log without enabling the noisy `debug_sip` packet trace. A missing line
+  for a failing caller means the packet is being lost upstream (router
+  SIP ALG, firewall/IPS auto-block, fail2ban ban, port-forward), not here.
+
 ## 1.0.6
 
 - Fix zombie calls + "declined" on quick redial in relay mode. The relay

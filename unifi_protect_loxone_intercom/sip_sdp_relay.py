@@ -337,9 +337,18 @@ def main():
                         break
                     except OSError:
                         break
+                    new_peer = client_addr not in sessions
                     sess = session_for(client_addr, now)
                     if sess is None:
                         continue
+                    if new_peer:
+                        # One line per new peer so "did the call even reach
+                        # us?" is answerable without a debug_sip trace.
+                        first_line = data.split(b"\r\n", 1)[0][:100]
+                        log("new peer %s:%d (%s): %s" % (
+                            client_addr[0], client_addr[1],
+                            "local" if is_local(client_addr[0]) else "external",
+                            first_line.decode("utf-8", "replace")))
                     sess.last_active = now
                     try:
                         sess.sock.send(sanitize_to_asterisk(data))
