@@ -27,11 +27,18 @@ supervised by `supervisord`:
 
 ## Current state
 
-- Assembled and **config-validated only** (shell syntax, template renders, YAML parse).
-- **Never built or run end-to-end.** No `docker build` was possible in the authoring
-  sandbox. Treat first build as a real bring-up.
-- Target arch assumed **amd64**; arm64 path exists (`--build-arg TARGETARCH=arm64`) but
-  is unverified.
+- **In production** (HA add-on on HAOS, amd64) and verified end-to-end on all
+  three call paths as of 1.0.8 (2026-07-25): LAN direct, remote via the
+  Loxone cloud relay (CGNAT/cellular), and remote direct-from-NAT (off-site
+  WiFi, phone dialing the WAN name itself).
+- The 1.0.3→1.0.8 releases were a live debugging campaign against real
+  Loxone remote-call traffic; the findings are recorded in "Confirmed from
+  live user captures" below and in CHANGELOG.md. Read those before touching
+  the relay or the SIP configs.
+- Relay regression tests: `python3 tests/test_relay.py` (live-socket flow +
+  unit tests for every capture-confirmed bug). Run them after ANY change to
+  `sip_sdp_relay.py`.
+- arm64 path exists (`--build-arg TARGETARCH=arm64`) but is unverified.
 
 ## Data flow (with source anchors in the vendored bridge)
 
@@ -114,11 +121,9 @@ the hostname literal whenever the local resolution is non-global.**
 
 ## Refinement backlog (priority order)
 
-1. **Bring-up.** Build, run, and prove `sip:9900@<host>` from a softphone
-   (Linphone/Zoiper, anonymous). Success log line: `switched speaker to LIVE audio`.
-   Only then wire Loxone. This validates the one inferred hop.
-2. **Lock the dialplan.** Once the real "Audio username" Loxone sends is known,
-   remove the `_X.` catch-all in `extensions.conf` (currently a convenience).
+~~1. Bring-up~~ **Done** — proven in production on all three call paths
+   (see Current state). ~~2. Lock the dialplan~~ **Done** — extensions.conf
+   is exact-match on `DOORBELL_EXTENSION` only; no catch-all exists.
 3. **go2rtc supervision.** The bridge spawns go2rtc but only kills it on shutdown
    (index.js `shutdown()` ~line 944). If go2rtc dies mid-run it is not respawned.
    Either run go2rtc as its own `supervisord` program (and set `GO2RTC_PATH` to a
@@ -129,9 +134,10 @@ the hostname literal whenever the local resolution is non-global.**
    reproducible builds.
 6. **arm64.** Verify go2rtc asset name + Asterisk package on arm64 if any target node
    is ARM, then drop the amd64 assumption note from README.
-7. **Remote/external audio (optional).** Loxone "external" fields need a SIP proxy.
-   Options: register Asterisk to an external proxy (Antisip-style) and fill the Door
-   Controller external host/username; or reverse-proxy 5060. Keep local working first.
+~~7. Remote/external audio~~ **Done** — solved by the `sdp-relay` component +
+   port-forward (ADVANCED.md > Remote access); no external SIP proxy needed.
+   Verified working from CGNAT/cellular (Loxone cloud relay) and from a
+   remote NAT'd WiFi (direct dial), 2026-07-25.
 8. **Door-open button (optional).** UniFi doorbells have no relay, so Loxone Q1–Q3
    would drive a Loxone-side relay, not the doorbell. Only relevant if a lock is wired
    to the Miniserver. `dtmf_mode=rfc4733` is already set if DTMF is ever needed.
