@@ -67,6 +67,50 @@ the phone is the more secure alternative.
    WAN) lets you put one value in both the local and external Loxone "Host for audio"
    fields.
 
+### Known issue: Loxone's remote-call client sends invalid SDP
+
+On the cloud-relayed **off-LAN** call path (i.e. calling in via the settings
+above), Loxone's own SIP client (`User-Agent: Loxone Pjsua2 Wrapper`) has been
+observed sending truncated SDP bandwidth lines — e.g. `:=4` instead of
+`b=AS:4` — which breaks RFC 4566's `<type>=<value>` line format. Asterisk
+correctly rejects the whole INVITE (`PJMEDIA_SDP_EINSDP`, `400 Bad Request`)
+before the call reaches the dialplan, so **the call fails from off-LAN while
+the exact same call works fine from the LAN**. This is a bug in Loxone's
+client, not in this project's Asterisk config — there's no PJSIP option to
+make SDP parsing lenient.
+
+As a workaround, `sip_sdp_fixup.py` (`sdp-fixup` under supervisord) sits on an
+NFQUEUE hook and strips any SDP body line that isn't a valid `<type>=<value>`
+line before Asterisk ever sees it (bandwidth lines are advisory, so dropping a
+malformed one is always safe — the codec/media lines are untouched). It:
+
+- **Only activates when `SIP_EXTERNAL_ADDRESS` is set** — the entrypoint
+  installs the NFQUEUE iptables rule only then; otherwise the process is
+  running but idle.
+- **Fails open** — the iptables rule uses `--queue-bypass`, so if the process
+  is down, traffic passes through unmodified instead of being blocked.
+- **Needs `NET_ADMIN`** to install the rule and bind the queue. Already added
+  to `docker-compose.yml` (`cap_add`), `k8s-deployment.yaml`
+  (`securityContext.capabilities`), and the add-on's `config.yaml`
+  (`privileged:`) — nothing to change if you deploy from this repo as-is.
+
+**Operational note:** because this runs under host networking, the iptables
+rule it installs lives in the **host's** netfilter tables, not a
+container-private namespace. The entrypoint checks before adding it, so
+restarts don't duplicate it, but if you permanently disable remote access or
+remove the container, clean it up manually on the host:
+```bash
+sudo iptables -t mangle -D PREROUTING -p udp --dport 5060 -j NFQUEUE --queue-num 5060 --queue-bypass
+```
+If it's still there and nothing is bound to queue 5060, `--queue-bypass`
+means it's a no-op — but it's tidy to remove it once you no longer need it.
+
+If you'd rather not grant `NET_ADMIN` at all, drop the `sdp-fixup` capability
+grants above and remove the `if [ -n "${SIP_EXTERNAL_ADDRESS:-}" ]` block in
+`entrypoint.sh`; remote calls will then fail with the `400`/`EINSDP` error
+above until Loxone fixes this in their client (worth reporting to Loxone
+support with a `debug_sip: true` capture attached).
+
 ---
 
 ## fail2ban (SIP scanner protection)

@@ -60,6 +60,22 @@ echo "[entrypoint] Rendering SIP transport extras..."
   fi
 } > /etc/asterisk/pjsip_transport_extra.conf
 
+# SDP sanitizer: Loxone's remote-call SIP client has been observed sending
+# malformed SDP bandwidth lines on the cloud-relayed off-LAN call path, which
+# Asterisk's SDP parser rejects outright (no PJSIP config can make it
+# lenient). sip_sdp_fixup.py (always running under supervisord) fixes those
+# lines in flight via NFQUEUE, but only ever sees traffic once this rule is
+# installed - so only wire it up when remote access is actually in use.
+# --queue-bypass fails open (traffic flows untouched) if that process is down.
+# Requires NET_ADMIN (already granted in docker-compose.yml/k8s-deployment.yaml/
+# config.yaml `privileged:`). See ADVANCED.md > Remote access.
+if [ -n "${SIP_EXTERNAL_ADDRESS:-}" ]; then
+  echo "[entrypoint] Remote access enabled: installing SDP sanitizer NFQUEUE rule..."
+  iptables -t mangle -C PREROUTING -p udp --dport 5060 -j NFQUEUE --queue-num 5060 --queue-bypass 2>/dev/null \
+    || iptables -t mangle -A PREROUTING -p udp --dport 5060 -j NFQUEUE --queue-num 5060 --queue-bypass \
+    || echo "[entrypoint] WARNING: could not install the NFQUEUE rule (missing NET_ADMIN?); continuing without the SDP sanitizer."
+fi
+
 echo "[entrypoint] Rendering go2rtc.yaml from PROTECT_CAMERA_PATH..."
 # '|' delimiter because the path contains slashes/colons
 sed "s|__PROTECT_CAMERA_PATH__|${PROTECT_CAMERA_PATH}|g" \
