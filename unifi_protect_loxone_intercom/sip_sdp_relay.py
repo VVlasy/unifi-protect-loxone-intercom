@@ -251,7 +251,11 @@ def main():
 
     sel = selectors.DefaultSelector()
     main_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    main_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    # Deliberately NO SO_REUSEADDR: on Linux UDP it would let another
+    # REUSEADDR socket (e.g. a stray Asterisk channel driver) bind :5060 too
+    # and, as the later binder, steal every packet. Exclusive bind means any
+    # port conflict fails loudly right here instead of silently blackholing
+    # calls - exactly what chan_sip did to 1.0.4.
     main_sock.bind(("0.0.0.0", RELAY_PORT))
     main_sock.setblocking(False)
     sel.register(main_sock, selectors.EVENT_READ, None)
