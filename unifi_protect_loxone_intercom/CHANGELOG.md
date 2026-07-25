@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.8
+
+- Advertise a numeric public IP to remote callers whenever possible. A live
+  capture from a caller stuck at "establishing connection" showed the phone
+  CANCELing an already-answered call: the 200 OK never reached it. That call
+  path crossed a consumer router whose SIP ALG evidently drops SDP it cannot
+  rewrite — and since 1.0.6's split-horizon fallback, the SDP `c=` line
+  carried a hostname, which ALGs handle worst of all. The relay now queries
+  the public name's A record directly at public resolvers (1.1.1.1 /
+  8.8.8.8), sidestepping split-horizon LAN DNS, and only falls back to the
+  hostname literal when no public answer is obtainable. New optional
+  `SIP_PUBLIC_IP` env var pins the advertised WAN IP explicitly and skips
+  all resolution. (Disabling SIP ALG on the remote router is still the
+  real fix for that class of breakage.)
+
 ## 1.0.7
 
 - Relay call visibility: one log line per new SIP peer

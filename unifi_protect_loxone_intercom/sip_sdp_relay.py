@@ -45,6 +45,7 @@ import os
 import re
 import selectors
 import socket
+import struct
 import sys
 import time
 
@@ -127,47 +128,117 @@ def lan_ip_toward(client_ip):
 _dns_cache = (None, 0.0)
 
 
+PUBLIC_IP_OVERRIDE = os.environ.get("SIP_PUBLIC_IP", "").strip()
+PUBLIC_RESOLVERS = ("1.1.1.1", "8.8.8.8")
+
 _warned_split_horizon = False
 
 
-def external_addr():
-    """SIP_EXTERNAL_ADDRESS resolved to a PUBLIC IPv4 literal (cached).
+def _dns_query_a(name, server, timeout=2.0):
+    """Minimal stdlib A-record lookup against a specific DNS server. Returns
+    the first A answer as dotted-quad text, or None."""
+    tid = struct.unpack("!H", os.urandom(2))[0]
+    q = struct.pack("!HHHHHH", tid, 0x0100, 1, 0, 0, 0)
+    for label in name.strip(".").split("."):
+        if not 0 < len(label) < 64:
+            return None
+        q += bytes([len(label)]) + label.encode()
+    q += b"\x00" + struct.pack("!HH", 1, 1)  # QTYPE=A, QCLASS=IN
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(timeout)
+    try:
+        s.sendto(q, (server, 53))
+        resp, _ = s.recvfrom(4096)
+    except OSError:
+        return None
+    finally:
+        s.close()
+    if len(resp) < 12 or resp[:2] != q[:2]:
+        return None
+    ancount = struct.unpack("!H", resp[6:8])[0]
+    i = 12
+    while i < len(resp) and resp[i] != 0:  # skip question name
+        if resp[i] & 0xC0 == 0xC0:
+            i += 1
+            break
+        i += resp[i] + 1
+    i += 1 + 4  # terminator + QTYPE/QCLASS
+    for _ in range(ancount):
+        while i < len(resp):  # skip answer name (labels or pointer)
+            b0 = resp[i]
+            if b0 & 0xC0 == 0xC0:
+                i += 2
+                break
+            if b0 == 0:
+                i += 1
+                break
+            i += b0 + 1
+        if i + 10 > len(resp):
+            return None
+        rtype, rclass, _ttl, rdlen = struct.unpack("!HHIH", resp[i:i + 10])
+        i += 10
+        if i + rdlen > len(resp):
+            return None
+        if rtype == 1 and rclass == 1 and rdlen == 4:
+            return socket.inet_ntoa(resp[i:i + 4])
+        i += rdlen
+    return None
 
-    Falls back to the hostname text itself when resolution fails OR when the
-    host's DNS returns a non-global address (split-horizon DNS resolving the
-    public name to the LAN IP). A remote caller sends its 2xx ACK and BYE to
-    the Contact we advertise; a private address there is a blackhole - the
-    call establishes but can never be torn down, and the bridge then declines
-    quick redials while the zombie session drains. With the hostname literal
-    the CALLER resolves it from its own vantage point, which is always right.
+
+def external_addr():
+    """The address advertised to off-LAN callers, best-first:
+
+    1. SIP_PUBLIC_IP env override - always wins.
+    2. SIP_EXTERNAL_ADDRESS as an explicit IP literal - user's choice.
+    3. The name's PUBLIC A record, queried directly at public resolvers
+       (1.1.1.1 / 8.8.8.8). This sidesteps split-horizon LAN DNS, which
+       resolves the public name to the LAN IP here - an address remote
+       callers can't use in Contact (their 2xx ACK/BYE would blackhole,
+       leaving zombie calls the bridge then 603-declines redials against).
+    4. The host resolver's answer, if it is a global address.
+    5. The hostname literal - callers resolve it from their own vantage
+       point. Correct but ALG-hostile: consumer-router SIP ALGs that can't
+       rewrite an FQDN in SDP c= have been observed dropping the whole
+       200 OK, so a numeric answer from step 3 is strongly preferred.
     """
     global _dns_cache, _warned_split_horizon
+    if PUBLIC_IP_OVERRIDE:
+        return PUBLIC_IP_OVERRIDE
     try:
         ipaddress.ip_address(EXTERNAL_ADDRESS)
-        return EXTERNAL_ADDRESS  # explicit IP literal: user's choice, trust it
+        return EXTERNAL_ADDRESS
     except ValueError:
         pass
     value, ts = _dns_cache
     now = time.monotonic()
     if value is not None and now - ts < DNS_TTL_SECS:
         return value
+    for resolver in PUBLIC_RESOLVERS:
+        answer = _dns_query_a(EXTERNAL_ADDRESS, resolver)
+        if answer and ipaddress.ip_address(answer).is_global:
+            _dns_cache = (answer, now)
+            return answer
+        # A non-global answer from a public resolver means port-53
+        # interception is feeding us the split-horizon record; keep going.
     try:
         resolved = socket.gethostbyname(EXTERNAL_ADDRESS)
+        if ipaddress.ip_address(resolved).is_global:
+            _dns_cache = (resolved, now)
+            return resolved
     except OSError:
-        if value is not None:
-            return value
-        log("DNS resolution of %s failed; using the hostname literally" % EXTERNAL_ADDRESS)
-        return EXTERNAL_ADDRESS
-    if not ipaddress.ip_address(resolved).is_global:
-        if not _warned_split_horizon:
-            _warned_split_horizon = True
-            log("split-horizon DNS detected: %s resolves to %s here, which "
-                "remote callers cannot reach; advertising the hostname "
-                "instead and letting callers resolve it themselves"
-                % (EXTERNAL_ADDRESS, resolved))
-        resolved = EXTERNAL_ADDRESS
-    _dns_cache = (resolved, now)
-    return resolved
+        pass
+    if value is not None:
+        return value
+    if not _warned_split_horizon:
+        _warned_split_horizon = True
+        log("could not learn a public IP for %s (split-horizon DNS and no "
+            "public-resolver answer); advertising the hostname literally. "
+            "If remote callers stall at call answer, set SIP_PUBLIC_IP to "
+            "your WAN IP." % EXTERNAL_ADDRESS)
+    # Cache the fallback too: a probe of unreachable resolvers costs seconds,
+    # and this runs on the datagram path - pay it once per TTL, not per packet.
+    _dns_cache = (EXTERNAL_ADDRESS, now)
+    return EXTERNAL_ADDRESS
 
 
 def advertised_for(client_ip):

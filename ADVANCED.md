@@ -52,10 +52,12 @@ the phone is the more secure alternative.
    Loxone "Audio username".
 2. **Advertise the public address** — set these in `.env` (no file edits). A
    split-horizon name (resolving to the LAN IP from inside) is fine: the SDP
-   relay detects a non-public resolution and advertises the hostname itself,
-   letting each caller resolve it from their own vantage point.
-   `SIP_LOCAL_NET` lists your private subnets (LAN, VPN) so on-net clients
-   stay on the private path:
+   relay learns the public A record by querying public resolvers
+   (1.1.1.1/8.8.8.8) directly, and advertises that numeric IP to remote
+   callers. If outbound port 53 is blocked or intercepted, set
+   `SIP_PUBLIC_IP=<your WAN IP>` to pin it explicitly. `SIP_LOCAL_NET`
+   lists your private subnets (LAN, VPN) so on-net clients stay on the
+   private path:
    ```ini
    SIP_EXTERNAL_ADDRESS=your-public-name.example.com
    SIP_LOCAL_NET=192.168.1.0/24,192.168.2.0/24
