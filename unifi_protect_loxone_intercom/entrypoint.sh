@@ -42,16 +42,29 @@ echo "[entrypoint] Rendering dialplan for extension ${DOORBELL_EXTENSION} (max c
 sed -i "s|__DOORBELL_EXTENSION__|${DOORBELL_EXTENSION}|g" /etc/asterisk/extensions.conf
 sed -i "s|__MAX_CALL_SECS__|${MAX_CALL_SECS:-600}|g" /etc/asterisk/extensions.conf
 
-# Optional remote-access transport settings (#included by pjsip.conf). Empty file
-# = LAN/VPN-only. Driven entirely by env so .env / addon options are the single
-# point of edit; no need to touch the baked-in pjsip.conf.
+# SIP topology: with SIP_EXTERNAL_ADDRESS set (remote access), the SDP-
+# sanitizing relay (sip_sdp_relay.py under supervisord) owns :5060 and
+# Asterisk moves to loopback behind it - the relay strips the malformed SDP
+# lines Loxone's remote-call client sends (which PJSIP would hard-reject with
+# PJMEDIA_SDP_EINSDP) and rewrites Asterisk's loopback self-references to the
+# right LAN/external address per caller. Without it, Asterisk binds :5060
+# directly, exactly as before. See ADVANCED.md > Remote access.
+if [ -n "${SIP_EXTERNAL_ADDRESS:-}" ]; then
+  SIP_BIND="127.0.0.1:${ASTERISK_SIP_PORT:-5070}"
+  echo "[entrypoint] Remote access enabled: SDP relay owns :5060, Asterisk binds ${SIP_BIND}."
+else
+  SIP_BIND="0.0.0.0:5060"
+fi
+sed -i "s|__SIP_BIND__|${SIP_BIND}|g" /etc/asterisk/pjsip.conf
+
+# Optional transport settings (#included by pjsip.conf). In relay mode the
+# relay does all address rewriting itself, so Asterisk must NOT get
+# external_media_address/external_signaling_address (they would mis-rewrite
+# toward the loopback peer); only local_net is ever rendered, and only in
+# direct mode where Asterisk still talks to real client addresses.
 echo "[entrypoint] Rendering SIP transport extras..."
 {
-  if [ -n "${SIP_EXTERNAL_ADDRESS:-}" ]; then
-    echo "external_media_address = ${SIP_EXTERNAL_ADDRESS}"
-    echo "external_signaling_address = ${SIP_EXTERNAL_ADDRESS}"
-  fi
-  if [ -n "${SIP_LOCAL_NET:-}" ]; then
+  if [ -z "${SIP_EXTERNAL_ADDRESS:-}" ] && [ -n "${SIP_LOCAL_NET:-}" ]; then
     IFS=',' read -ra _nets <<< "${SIP_LOCAL_NET}"
     for _n in "${_nets[@]}"; do
       _n="$(echo "${_n}" | tr -d '[:space:]')"
@@ -59,22 +72,6 @@ echo "[entrypoint] Rendering SIP transport extras..."
     done
   fi
 } > /etc/asterisk/pjsip_transport_extra.conf
-
-# SDP sanitizer: Loxone's remote-call SIP client has been observed sending
-# malformed SDP bandwidth lines on the cloud-relayed off-LAN call path, which
-# Asterisk's SDP parser rejects outright (no PJSIP config can make it
-# lenient). sip_sdp_fixup.py (always running under supervisord) fixes those
-# lines in flight via NFQUEUE, but only ever sees traffic once this rule is
-# installed - so only wire it up when remote access is actually in use.
-# --queue-bypass fails open (traffic flows untouched) if that process is down.
-# Requires NET_ADMIN (already granted in docker-compose.yml/k8s-deployment.yaml/
-# config.yaml `privileged:`). See ADVANCED.md > Remote access.
-if [ -n "${SIP_EXTERNAL_ADDRESS:-}" ]; then
-  echo "[entrypoint] Remote access enabled: installing SDP sanitizer NFQUEUE rule..."
-  iptables -t mangle -C PREROUTING -p udp --dport 5060 -j NFQUEUE --queue-num 5060 --queue-bypass 2>/dev/null \
-    || iptables -t mangle -A PREROUTING -p udp --dport 5060 -j NFQUEUE --queue-num 5060 --queue-bypass \
-    || echo "[entrypoint] WARNING: could not install the NFQUEUE rule (missing NET_ADMIN?); continuing without the SDP sanitizer."
-fi
 
 echo "[entrypoint] Rendering go2rtc.yaml from PROTECT_CAMERA_PATH..."
 # '|' delimiter because the path contains slashes/colons

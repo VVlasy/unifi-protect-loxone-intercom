@@ -80,21 +80,17 @@ RUN set -eux; \
     ldconfig; \
     rm -rf /tmp/mjpg /var/lib/apt/lists/*
 
-# --- SDP sanitizer (NFQUEUE) for remote access --------------------------------
+# --- SDP-sanitizing SIP relay for remote access -------------------------------
 # Works around a Loxone remote-call SIP client bug (malformed SDP bandwidth
 # lines on the cloud-relayed off-LAN call path) that Asterisk's SDP parser
-# rejects outright. Only ever queues traffic when SIP_EXTERNAL_ADDRESS is set
-# (entrypoint.sh installs the iptables rule); otherwise this sits idle. See
-# sip_sdp_fixup.py and ADVANCED.md > Remote access.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        iptables \
-        python3 \
-        python3-pip \
-        python3-dev \
-        libnetfilter-queue-dev \
-    && pip3 install --break-system-packages --no-cache-dir NetfilterQueue \
+# rejects outright. When SIP_EXTERNAL_ADDRESS is set the relay owns :5060 and
+# Asterisk moves behind it on loopback; otherwise it idles and Asterisk binds
+# :5060 directly. Pure-userspace stdlib Python - no NFQUEUE/NET_ADMIN (the
+# 1.0.3 NFQUEUE approach died on HAOS kernels that lack nfnetlink_queue).
+# See sip_sdp_relay.py and ADVANCED.md > Remote access.
+RUN apt-get update && apt-get install -y --no-install-recommends python3 \
     && rm -rf /var/lib/apt/lists/*
-COPY sip_sdp_fixup.py /app/sip_sdp_fixup.py
+COPY sip_sdp_relay.py /app/sip_sdp_relay.py
 
 # --- our config & glue -------------------------------------------------------
 COPY asterisk/         /etc/asterisk/

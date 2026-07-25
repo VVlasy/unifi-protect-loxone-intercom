@@ -22,3 +22,17 @@ filter   = asterisk
 logpath  = /opt/doorbell/asterisk-log/security
 port     = 5060,5061
 protocol = udp
+
+# With remote access enabled (SIP_EXTERNAL_ADDRESS set) the SDP-sanitizing
+# relay owns :5060 and Asterisk only ever sees 127.0.0.1 as a source, so the
+# [asterisk] jail above goes blind to external scanners. This jail watches the
+# relay's own security log instead (real client IPs, 4xx/5xx responses).
+# Requires fail2ban/filter.d/doorbell-relay.conf copied to
+# /etc/fail2ban/filter.d/. Harmless to leave enabled in direct mode - the
+# log file just stays empty.
+[doorbell-relay]
+enabled  = true
+filter   = doorbell-relay
+logpath  = /opt/doorbell/asterisk-log/relay_security
+port     = 5060
+protocol = udp

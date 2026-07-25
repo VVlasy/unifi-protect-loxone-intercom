@@ -1,5 +1,5 @@
 ---
-version: 1.0.3
+version: 1.0.4
 name: UniFi Protect Loxone Intercom
 slug: unifi_protect_loxone_intercom
 description: >-
@@ -23,11 +23,6 @@ stage: stable
 # uses the Home Assistant host's LAN IP directly, which is also the IP you
 # give Loxone as "Host for audio".
 host_network: true
-# NET_ADMIN: lets the entrypoint install a (no-op unless sip_external_address
-# is set) NFQUEUE iptables rule that sanitizes malformed SDP from a known
-# Loxone remote-call client bug before it reaches Asterisk. See ADVANCED.md.
-privileged:
-  - NET_ADMIN
 options:
   protect_camera_path: ""
   protect_base: ""

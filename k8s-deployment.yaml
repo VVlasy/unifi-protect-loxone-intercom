@@ -62,10 +62,6 @@ spec:
             - secretRef:
                 name: doorbell-bridge-env
           securityContext:
-            # NET_BIND_SERVICE/NET_RAW: Asterisk + go2rtc bind low/wide port
-            # ranges; host net needs this. NET_ADMIN: lets the entrypoint
-            # install a (no-op unless SIP_EXTERNAL_ADDRESS is set) NFQUEUE
-            # iptables rule that sanitizes malformed SDP from a known Loxone
-            # remote-call client bug before it reaches Asterisk. See ADVANCED.md.
+            # Asterisk + go2rtc bind low/wide port ranges; host net needs this.
             capabilities:
-              add: ["NET_BIND_SERVICE", "NET_RAW", "NET_ADMIN"]
+              add: ["NET_BIND_SERVICE", "NET_RAW"]
