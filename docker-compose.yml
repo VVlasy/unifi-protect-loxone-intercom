@@ -16,11 +16,6 @@ services:
     container_name: unifi-loxone-doorbell
     restart: unless-stopped
     network_mode: host
-    # NET_ADMIN: lets the entrypoint install a (no-op unless SIP_EXTERNAL_ADDRESS
-    # is set) NFQUEUE iptables rule that sanitizes malformed SDP from a known
-    # Loxone remote-call client bug before it reaches Asterisk. See ADVANCED.md.
-    cap_add:
-      - NET_ADMIN
     env_file:
       - .env
     # Everything is rendered at boot from .env; nothing needs to be persisted.

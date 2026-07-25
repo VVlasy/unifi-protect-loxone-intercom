@@ -17,10 +17,13 @@ supervised by `supervisord`:
   It also **spawns go2rtc itself**.
 - **go2rtc** — pulls the doorbell RTSPS stream; serves audio to the bridge and an
   MJPEG image to Loxone.
-- **`sdp-fixup`** (`sip_sdp_fixup.py`) — NFQUEUE handler that strips malformed
-  SDP body lines from inbound :5060 traffic before Asterisk parses them.
-  Workaround for a Loxone remote-call client bug (see below); idle no-op
-  unless `SIP_EXTERNAL_ADDRESS` is set. Needs `NET_ADMIN`.
+- **`sdp-relay`** (`sip_sdp_relay.py`) — userspace SIP relay. With
+  `SIP_EXTERNAL_ADDRESS` set it owns UDP :5060 and Asterisk moves to
+  127.0.0.1:5070 behind it; it sanitizes malformed inbound SDP (Loxone
+  remote-call client bug, see below) and rewrites Asterisk's loopback
+  self-references (Contact/Via + SDP c=/o=) to the per-caller LAN/external
+  address, replacing Asterisk's external_* transport options. Idle no-op
+  otherwise (Asterisk binds :5060 directly). Stdlib Python, no privileges.
 
 ## Current state
 
@@ -66,17 +69,19 @@ Loxone/Asterisk side is **G.711 PCMU** end to end (sdp template + pjsip `allow=u
   Pattern matches documented 2N/Grandstream+Loxone, but this exact bridge→Asterisk→
   Loxone chain is untested. **De-risk per README §5 before anything else.**
 
-**Confirmed from a live user capture (2026-07-25):** Loxone's remote/off-LAN
-SIP client (`User-Agent: Loxone Pjsua2 Wrapper`, via its cloud relay) sends
-SDP bodies with truncated bandwidth lines (`:=4` instead of `b=AS:4`), which
-Asterisk correctly rejects (`PJMEDIA_SDP_EINSDP`/400) — remote calls failed
-while LAN calls worked. This is a Loxone client bug, not an Asterisk config
-bug; there's no PJSIP option to relax SDP parsing. Worked around with the
-`sdp-fixup` NFQUEUE component above (`sip_sdp_fixup.py`) — see ADVANCED.md
-"Known issue: Loxone's remote-call client sends invalid SDP" for the full
-writeup, activation condition, and the host-level iptables cleanup caveat
-(host networking means the rule lives in the host's netfilter tables, not a
-container-private namespace).
+**Confirmed from live user captures (2026-07-25):** Loxone's remote/off-LAN
+SIP client (`User-Agent: Loxone Pjsua2 Wrapper`, via its cloud relay; seen on
+cellular/CGNAT connections) sends SDP bodies with truncated bandwidth lines
+(`:=4` instead of `b=AS:4`), which Asterisk correctly rejects
+(`PJMEDIA_SDP_EINSDP`/400) — remote calls failed while LAN calls worked. This
+is a Loxone client bug, not an Asterisk config bug; there's no PJSIP option
+to relax SDP parsing. **1.0.3 tried an NFQUEUE fix — dead end: the HAOS
+kernel has no nfnetlink_queue module** (`iptables ... RULE_APPEND failed`
+in the boot log), which is why 1.0.4 replaced it with the `sdp-relay`
+userspace component above. See ADVANCED.md "Known issue: Loxone's
+remote-call client sends invalid SDP". Relay-mode side effect: Asterisk only
+sees 127.0.0.1 sources, so fail2ban gained a `doorbell-relay` filter/jail
+fed by the relay's own `relay_security` log.
 
 ## Guardrails — do not regress these
 
@@ -87,13 +92,15 @@ container-private namespace).
 3. **ARI bound to 127.0.0.1 only** (http.conf). Don't expose 8088 on the LAN.
 4. **`RING_DELAY_MS >= 3000`** — author-documented latency cliff below ~2.5–3 s.
 5. Keep the bridge commit **pinned**; this is an unmaintained solo project.
-6. `sdp-fixup` needs `NET_ADMIN` (docker-compose `cap_add` / k8s
-   `securityContext.capabilities` / add-on `config.yaml` `privileged:`) — this
-   is now granted unconditionally (HA doesn't support conditional privilege
-   grants), even though the NFQUEUE rule itself only gets installed when
-   `SIP_EXTERNAL_ADDRESS` is set. Don't silently drop this privilege without
-   also gating/removing the `sdp-fixup` program, or remote calls regress to
-   the `PJMEDIA_SDP_EINSDP` failure above.
+6. **Relay mode is all-or-nothing on :5060.** With `SIP_EXTERNAL_ADDRESS`
+   set, `sdp-relay` owns :5060 and Asterisk MUST bind 127.0.0.1:5070 (the
+   entrypoint renders `__SIP_BIND__` in pjsip.conf accordingly) and Asterisk
+   must NOT get external_media_address/external_signaling_address (the relay
+   does all rewriting; setting them would corrupt it). Don't "fix" the
+   loopback bind back to 0.0.0.0:5060 in relay mode — the two would fight
+   over the port — and don't remove the relay without restoring the direct
+   bind, or SIP dies entirely. NFQUEUE is a known dead end on HAOS (no
+   nfnetlink_queue kernel module); don't reintroduce it.
 
 ## Refinement backlog (priority order)
 
@@ -163,8 +170,9 @@ docs stay at the root. Paths below are relative to `unifi_protect_loxone_interco
   ari/http/rtp/modules. **Every user-facing asterisk setting is env-driven** (no
   hand-edited files) so .env / the HA options map is the single source.
 - `go2rtc.yaml.template` — audio + video streams from `PROTECT_CAMERA_PATH`.
-- `sip_sdp_fixup.py` — NFQUEUE handler for the `sdp-fixup` supervisord program;
-  see "Confirmed from a live user capture" above and ADVANCED.md.
+- `sip_sdp_relay.py` — the `sdp-relay` supervisord program; see "Confirmed
+  from live user captures" above and ADVANCED.md. Companion fail2ban files:
+  `fail2ban/filter.d/doorbell-relay.conf` + the `[doorbell-relay]` jail.
 - `.env.example` — **slimmed to the 4 required PROTECT_* values + an optional block**;
   internal vars are Dockerfile `ENV` defaults (bridge reads env directly; setup.js NOT used).
 - `README.md` — public-facing quickstart. `ADVANCED.md` — LXC, remote SIP, fail2ban,

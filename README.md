@@ -147,6 +147,7 @@ icon opens two-way audio through `9900`.
 | 1984            | TCP     | Loxone ← mjpg-streamer (video image)      |
 | 8554            | TCP     | internal (bridge ← go2rtc audio)          |
 | 1985 / 8088     | TCP     | localhost only (go2rtc API / ARI)         |
+| 5070            | UDP     | localhost only (Asterisk behind the SDP relay — remote-access mode, see ADVANCED.md) |
 
 Open `5060/udp`, `10000-10200/udp` and `1984/tcp` on the host firewall toward your
 LAN.

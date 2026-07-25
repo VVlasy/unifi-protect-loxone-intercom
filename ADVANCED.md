@@ -70,46 +70,53 @@ the phone is the more secure alternative.
 ### Known issue: Loxone's remote-call client sends invalid SDP
 
 On the cloud-relayed **off-LAN** call path (i.e. calling in via the settings
-above), Loxone's own SIP client (`User-Agent: Loxone Pjsua2 Wrapper`) has been
-observed sending truncated SDP bandwidth lines — e.g. `:=4` instead of
-`b=AS:4` — which breaks RFC 4566's `<type>=<value>` line format. Asterisk
-correctly rejects the whole INVITE (`PJMEDIA_SDP_EINSDP`, `400 Bad Request`)
-before the call reaches the dialplan, so **the call fails from off-LAN while
-the exact same call works fine from the LAN**. This is a bug in Loxone's
-client, not in this project's Asterisk config — there's no PJSIP option to
-make SDP parsing lenient.
+above — observed on cellular/CGNAT connections), Loxone's own SIP client
+(`User-Agent: Loxone Pjsua2 Wrapper`) has been observed sending truncated SDP
+bandwidth lines — e.g. `:=4` instead of `b=AS:4` — which breaks RFC 4566's
+`<type>=<value>` line format. Asterisk correctly rejects the whole INVITE
+(`PJMEDIA_SDP_EINSDP`, `400 Bad Request`) before the call reaches the
+dialplan, so **the call fails from off-LAN while the exact same call works
+fine from the LAN**. This is a bug in Loxone's client, not in this project's
+Asterisk config — there's no PJSIP option to make SDP parsing lenient (worth
+reporting to Loxone support with a `debug_sip: true` capture attached).
 
-As a workaround, `sip_sdp_fixup.py` (`sdp-fixup` under supervisord) sits on an
-NFQUEUE hook and strips any SDP body line that isn't a valid `<type>=<value>`
-line before Asterisk ever sees it (bandwidth lines are advisory, so dropping a
-malformed one is always safe — the codec/media lines are untouched). It:
+As a workaround, setting `SIP_EXTERNAL_ADDRESS` activates **relay mode**:
+`sip_sdp_relay.py` (`sdp-relay` under supervisord) takes ownership of UDP
+`:5060` and Asterisk moves behind it to `127.0.0.1:5070`. Every caller — LAN
+and remote, same port `5060`, no router changes — then passes through the
+relay, which:
 
-- **Only activates when `SIP_EXTERNAL_ADDRESS` is set** — the entrypoint
-  installs the NFQUEUE iptables rule only then; otherwise the process is
-  running but idle.
-- **Fails open** — the iptables rule uses `--queue-bypass`, so if the process
-  is down, traffic passes through unmodified instead of being blocked.
-- **Needs `NET_ADMIN`** to install the rule and bind the queue. Already added
-  to `docker-compose.yml` (`cap_add`), `k8s-deployment.yaml`
-  (`securityContext.capabilities`), and the add-on's `config.yaml`
-  (`privileged:`) — nothing to change if you deploy from this repo as-is.
+- strips any SDP body line that isn't a valid `<type>=<value>` line before
+  Asterisk parses it (bandwidth lines are advisory, so dropping a malformed
+  one is always safe — the codec/media lines are untouched), and
+- rewrites Asterisk's loopback self-references (Contact/Via headers, SDP
+  `c=`/`o=` lines) on the way out to the address each caller must actually
+  use: the host's LAN IP for callers inside `SIP_LOCAL_NET` (or RFC1918 space
+  if unset), the resolved `SIP_EXTERNAL_ADDRESS` for everyone else. This
+  replaces Asterisk's `external_media_address`/`external_signaling_address`
+  mechanism, which the entrypoint no longer renders in relay mode.
 
-**Operational note:** because this runs under host networking, the iptables
-rule it installs lives in the **host's** netfilter tables, not a
-container-private namespace. The entrypoint checks before adding it, so
-restarts don't duplicate it, but if you permanently disable remote access or
-remove the container, clean it up manually on the host:
+RTP is untouched — media still flows directly between the caller and
+Asterisk on `10000–10200/udp`. Without `SIP_EXTERNAL_ADDRESS`, the relay
+idles and Asterisk binds `:5060` directly, exactly as before — LAN/VPN-only
+installs have no new moving parts.
+
+**Trade-off to be aware of:** in relay mode the relay is in the signaling
+path of *every* call, LAN included. If it dies, supervisord restarts it
+within seconds, but a hard failure would take SIP down entirely (video and
+the ring webhook are unaffected). It is ~300 lines of stdlib Python with no
+privileges beyond binding a port; still, if you ever need to bisect a
+problem, unset `SIP_EXTERNAL_ADDRESS` and you are back to the direct,
+relay-free topology.
+
+**History:** 1.0.3 attempted this fix with an NFQUEUE iptables hook, which
+turned out not to work on Home Assistant OS (its kernel ships no
+`nfnetlink_queue` module) and needed `NET_ADMIN`. 1.0.4 replaced it with the
+relay; the capability grant is gone. If you ran 1.0.3 on a host where the
+rule *did* install, remove the leftover (it's a harmless no-op, but tidy):
 ```bash
 sudo iptables -t mangle -D PREROUTING -p udp --dport 5060 -j NFQUEUE --queue-num 5060 --queue-bypass
 ```
-If it's still there and nothing is bound to queue 5060, `--queue-bypass`
-means it's a no-op — but it's tidy to remove it once you no longer need it.
-
-If you'd rather not grant `NET_ADMIN` at all, drop the `sdp-fixup` capability
-grants above and remove the `if [ -n "${SIP_EXTERNAL_ADDRESS:-}" ]` block in
-`entrypoint.sh`; remote calls will then fail with the `400`/`EINSDP` error
-above until Loxone fixes this in their client (worth reporting to Loxone
-support with a `debug_sip: true` capture attached).
 
 ---
 
@@ -125,17 +132,25 @@ container.
    volumes:
      - ./asterisk-log:/var/log/asterisk
    ```
-2. Install and wire the jail (edit the subnets in
+2. Install and wire the jails (edit the subnets in
    [`fail2ban/jail.d/asterisk-doorbell.local`](fail2ban/jail.d/asterisk-doorbell.local)
    to your LAN/VPN first):
    ```bash
    apt-get install -y fail2ban iptables
    cp fail2ban/jail.d/asterisk-doorbell.local /etc/fail2ban/jail.d/
+   cp fail2ban/filter.d/doorbell-relay.conf /etc/fail2ban/filter.d/
    # If this host has no /var/log/auth.log, disable the stock sshd jail:
    sed -i 's/^enabled = true/enabled = false/' /etc/fail2ban/jail.d/defaults-debian.conf
    systemctl enable --now fail2ban
    fail2ban-client status asterisk
+   fail2ban-client status doorbell-relay
    ```
+
+**Relay mode caveat:** with `SIP_EXTERNAL_ADDRESS` set (see the known-issue
+section above), all SIP reaches Asterisk from `127.0.0.1`, so the `[asterisk]`
+jail can no longer see scanner IPs. The `[doorbell-relay]` jail covers that:
+the relay logs every 4xx/5xx it forwards to an off-LAN peer (with the real
+address) to `relay_security` in the same bind-mounted log directory.
 The jail's `ignoreip` whitelists your LAN + VPN so it never bans your own clients or
 admin SSH.
 

@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.4
+
+- Replace the 1.0.3 NFQUEUE-based SDP fix, which could not work on Home
+  Assistant OS (its kernel ships no `nfnetlink_queue` module — the rule
+  install failed at boot and the sanitizer never saw a packet), with a
+  userspace SIP relay. With `sip_external_address` set, `sip_sdp_relay.py`
+  now owns UDP `:5060` and Asterisk moves behind it to `127.0.0.1:5070`;
+  callers keep dialing the same host and port, LAN and remote alike, with no
+  router changes. The relay strips the malformed SDP lines Loxone's
+  remote-call client sends and rewrites Asterisk's loopback self-references
+  to the correct LAN/external address per caller (replacing Asterisk's
+  `external_media_address`/`external_signaling_address` mechanism). RTP is
+  unaffected. Without `sip_external_address`, the relay idles and Asterisk
+  binds `:5060` directly, as before.
+- The `NET_ADMIN` privilege added in 1.0.3 is no longer needed and has been
+  removed again (add-on `config.yaml`, `docker-compose.yml`,
+  `k8s-deployment.yaml`).
+- New fail2ban companion for relay mode: Asterisk now only sees `127.0.0.1`,
+  so the relay logs 4xx/5xx responses to off-LAN peers (real IPs) to
+  `relay_security` next to the Asterisk security log; a new
+  `doorbell-relay` filter/jail ships in `fail2ban/`. See ADVANCED.md.
+
 ## 1.0.3
 
 - Work around a Loxone remote-call SIP client bug: on the cloud-relayed
