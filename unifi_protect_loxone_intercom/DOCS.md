@@ -129,6 +129,11 @@ fixed.
 - **No video in Loxone** → open `http://<host>:1984/?action=stream` in a
   browser. If blank, the RTSP share link / `protect_camera_path` is wrong
   or RTSP isn't enabled on the camera.
+- **Video frozen** → the app's video watchdog restarts ffmpeg, then
+  mjpg-streamer, then go2rtc (not during a call) on its own within a few
+  minutes. Look for `[video-watchdog]` lines in the log. If the log shows
+  `404 Not Found` for `unifi_doorbell_video` for longer than that, restart
+  the app and check the camera is online in Protect.
 - **Video rotated the wrong way** → change `mjpeg_rotation`.
 - **Bridge keeps restarting** → check `protect_api_key` / `camera_id`; the
   bridge validates the talkback session on connect.

@@ -124,10 +124,14 @@ the hostname literal whenever the local resolution is non-global.**
 ~~1. Bring-up~~ **Done** — proven in production on all three call paths
    (see Current state). ~~2. Lock the dialplan~~ **Done** — extensions.conf
    is exact-match on `DOORBELL_EXTENSION` only; no catch-all exists.
-3. **go2rtc supervision.** The bridge spawns go2rtc but only kills it on shutdown
-   (index.js `shutdown()` ~line 944). If go2rtc dies mid-run it is not respawned.
-   Either run go2rtc as its own `supervisord` program (and set `GO2RTC_PATH` to a
-   no-op/external) or add a watchdog. Decide one; don't double-spawn.
+3. **go2rtc supervision.** Partly done (1.0.9). The bridge spawns go2rtc and
+   `process.exit(1)`s on a NON-zero go2rtc exit (index.js `startGo2Rtc()` ~line
+   156), so supervisord's bridge restart respawns go2rtc; a code-0 exit would
+   leave it dead. `video-watchdog.sh` now SIGKILLs a go2rtc that has lost the
+   camera (no `api/frame.jpeg`) after repeated stale strikes, skipping active
+   calls. Remaining: a wedged go2rtc that still serves video but not audio is
+   not detected. Running go2rtc as its own `supervisord` program would be the
+   cleaner end state; don't double-spawn.
 4. **Startup race.** `supervisord.conf` waits for ARI via curl before `node index.js`.
    Confirm this holds on slow nodes; if flaky, gate on a deeper ARI readiness check.
 5. **Pin go2rtc.** Dockerfile uses `GO2RTC_VERSION=latest`. Pin to a release tag for
