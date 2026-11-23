@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.9
+
+- Video watchdog now recovers a stuck go2rtc. Seen in production: go2rtc
+  stayed up but lost the doorbell feed, so every request for
+  `unifi_doorbell_video` got `404 Not Found`. The watchdog only ever
+  restarted ffmpeg and mjpg-streamer, so the Loxone image stayed frozen
+  until the app was restarted by hand. After 4 consecutive stale strikes
+  (about 2 minutes without frames) the watchdog now asks go2rtc for a
+  frame directly; if go2rtc can't produce one either, it SIGKILLs go2rtc,
+  the bridge exits on that, and supervisord restarts the bridge, which
+  spawns a fresh go2rtc. Skipped while Asterisk has an active call, and at
+  most once per 5 minutes so a camera that is really offline doesn't cause
+  restart churn. Tunable via `VIDEO_GO2RTC_RESTART_STRIKES` (0 disables)
+  and `VIDEO_GO2RTC_RESTART_COOLDOWN` env vars.
+
 ## 1.0.8
 
 - Advertise a numeric public IP to remote callers whenever possible. A live
